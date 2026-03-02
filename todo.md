@@ -269,3 +269,9 @@
 - [x] Form re-syncs when a different job card is opened (useEffect on jc.id)
 - [x] Kanban board onUpdate opens the same full edit dialog
 - [x] Save checkpoint
+
+## Bug Fix: Empty SelectItem value on Tasks page
+- [x] Found two empty-string SelectItem values: "Unassigned" (assignedTo) and "No order" (orderId)
+- [x] Replaced with sentinel values "unassigned" and "no_order"
+- [x] Updated mutation to treat sentinels as undefined (no assignment / no order)
+- [x] Save checkpoint

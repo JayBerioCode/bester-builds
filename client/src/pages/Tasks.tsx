@@ -54,8 +54,8 @@ function TaskForm({ onSuccess, employees, orders }: { onSuccess: () => void; emp
       description: form.description,
       status: form.status as any,
       priority: form.priority as any,
-      assignedTo: form.assignedTo ? parseInt(form.assignedTo) : undefined,
-      orderId: form.orderId ? parseInt(form.orderId) : undefined,
+      assignedTo: (form.assignedTo && form.assignedTo !== "unassigned") ? parseInt(form.assignedTo) : undefined,
+      orderId: (form.orderId && form.orderId !== "no_order") ? parseInt(form.orderId) : undefined,
       dueDate: form.dueDate ? new Date(form.dueDate) : undefined,
       estimatedHours: form.estimatedHours || undefined,
     });
@@ -97,7 +97,7 @@ function TaskForm({ onSuccess, employees, orders }: { onSuccess: () => void; emp
           <Select value={form.assignedTo} onValueChange={(v) => setForm({ ...form, assignedTo: v })}>
             <SelectTrigger><SelectValue placeholder="Select employee..." /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Unassigned</SelectItem>
+              <SelectItem value="unassigned">Unassigned</SelectItem>
               {employees.map((e) => <SelectItem key={e.id} value={String(e.id)}>{e.name} ({e.role.replace(/_/g, " ")})</SelectItem>)}
             </SelectContent>
           </Select>
@@ -107,7 +107,7 @@ function TaskForm({ onSuccess, employees, orders }: { onSuccess: () => void; emp
           <Select value={form.orderId} onValueChange={(v) => setForm({ ...form, orderId: v })}>
             <SelectTrigger><SelectValue placeholder="Select order..." /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No order</SelectItem>
+              <SelectItem value="no_order">No order</SelectItem>
               {orders.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.orderNumber} — {o.title}</SelectItem>)}
             </SelectContent>
           </Select>
