@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, FileText, Search, Download } from "lucide-react";
+import { Plus, FileText, Search, Download, Hash } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -31,6 +31,7 @@ function InvoiceForm({ onSuccess, customers, orders }: { onSuccess: () => void; 
   const [form, setForm] = useState({
     customerId: "",
     orderId: "none",
+    poNumber: "",
     subtotal: "",
     taxRate: "15",
     discountAmount: "0",
@@ -50,6 +51,7 @@ function InvoiceForm({ onSuccess, customers, orders }: { onSuccess: () => void; 
     create.mutate({
       customerId: parseInt(form.customerId),
       orderId: form.orderId && form.orderId !== "none" ? parseInt(form.orderId) : undefined,
+      poNumber: form.poNumber || undefined,
       subtotal: form.subtotal,
       taxRate: form.taxRate,
       taxAmount: tax.toFixed(2),
@@ -83,6 +85,17 @@ function InvoiceForm({ onSuccess, customers, orders }: { onSuccess: () => void; 
               {orders.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.orderNumber} — {o.title}</SelectItem>)}
             </SelectContent>
           </Select>
+        </div>
+        <div className="space-y-1.5 col-span-2">
+          <Label className="flex items-center gap-1.5">
+            Purchase Order Number
+            <span className="text-xs font-normal text-muted-foreground">(optional — enables Job Card generation)</span>
+          </Label>
+          <Input
+            value={form.poNumber}
+            onChange={(e) => setForm({ ...form, poNumber: e.target.value })}
+            placeholder="e.g. PO-2024-001"
+          />
         </div>
         <div className="space-y-1.5">
           <Label>Subtotal (ZAR) *</Label>
@@ -230,6 +243,11 @@ export default function Invoices() {
                       <span>Client: {getCustomerName(inv.customerId)}</span>
                       <span>Total: <strong className="text-foreground">R {parseFloat(inv.total as string).toLocaleString()}</strong></span>
                       <span>Due: <strong className={inv.status === "overdue" ? "text-red-600" : "text-foreground"}>{new Date(inv.dueDate).toLocaleDateString()}</strong></span>
+                      {(inv as any).poNumber && (
+                        <span className="inline-flex items-center gap-1 text-purple-600 font-medium">
+                          <Hash className="h-3 w-3" />PO: {(inv as any).poNumber}
+                        </span>
+                      )}
                       {parseFloat(inv.amountPaid as string) > 0 && (
                         <span>Paid: R {parseFloat(inv.amountPaid as string).toLocaleString()}</span>
                       )}

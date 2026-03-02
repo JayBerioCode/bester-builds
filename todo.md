@@ -219,3 +219,9 @@
 - [x] Add Job Cards nav item to Operations group in sidebar
 - [x] Write vitest tests for job card procedures
 - [x] Save checkpoint
+
+## PO Number on Invoice Form
+- [x] Add PO Number input to invoice create form
+- [x] Wire poNumber to invoices.create and invoices.update tRPC mutations
+- [x] Show PO Number badge in invoice list (purple, with hash icon)
+- [x] Save checkpoint

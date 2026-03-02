@@ -412,10 +412,11 @@ const invoicesRouter = router({
     .input(z.object({ id: z.number() }))
     .query(({ input }) => getInvoiceById(input.id)),
 
-  create: protectedProcedure
+   create: protectedProcedure
     .input(z.object({
       customerId: z.number(),
       orderId: z.number().optional(),
+      poNumber: z.string().optional(),
       subtotal: z.string(),
       taxRate: z.string().optional(),
       taxAmount: z.string().optional(),
@@ -430,11 +431,11 @@ const invoicesRouter = router({
       const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
       return createInvoice({ ...input, invoiceNumber });
     }),
-
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
       status: z.enum(["draft", "sent", "viewed", "partial", "paid", "overdue", "cancelled"]).optional(),
+      poNumber: z.string().optional().nullable(),
       notes: z.string().optional(),
       terms: z.string().optional(),
       dueDate: z.date().optional(),
