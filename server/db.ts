@@ -1437,3 +1437,120 @@ export async function markAllowlistSignedUp(email: string): Promise<void> {
     .set({ hasSignedUp: true })
     .where(eq(employeeAllowlist.email, email.toLowerCase().trim()));
 }
+
+// ─── Shift Approval Workflow ─────────────────────────────────────────────────
+
+/** Fetch shifts for the approval queue, optionally filtered by status and/or employee. */
+export async function listShiftsForApproval(opts?: {
+  status?: "pending" | "approved" | "rejected";
+  employeeId?: number;
+  limit?: number;
+}) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [sql`${shiftLogs.clockOut} IS NOT NULL`];
+  if (opts?.status) conditions.push(eq(shiftLogs.approvalStatus, opts.status));
+  if (opts?.employeeId) conditions.push(eq(shiftLogs.employeeId, opts.employeeId));
+  const rows = await db
+    .select({
+      id: shiftLogs.id,
+      employeeId: shiftLogs.employeeId,
+      employeeName: employees.name,
+      employeeRole: employees.role,
+      clockIn: shiftLogs.clockIn,
+      clockOut: shiftLogs.clockOut,
+      hoursWorked: shiftLogs.hoursWorked,
+      earnings: shiftLogs.earnings,
+      notes: shiftLogs.notes,
+      approvalStatus: shiftLogs.approvalStatus,
+      approvedBy: shiftLogs.approvedBy,
+      approvedByName: shiftLogs.approvedByName,
+      approvedAt: shiftLogs.approvedAt,
+      rejectionReason: shiftLogs.rejectionReason,
+      createdAt: shiftLogs.createdAt,
+    })
+    .from(shiftLogs)
+    .leftJoin(employees, eq(shiftLogs.employeeId, employees.id))
+    .where(and(...conditions))
+    .orderBy(desc(shiftLogs.clockIn))
+    .limit(opts?.limit ?? 200);
+  return rows;
+}
+
+/** Approve a single shift log. */
+export async function approveShift(
+  shiftId: number,
+  approvedById: number,
+  approvedByName: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(shiftLogs)
+    .set({
+      approvalStatus: "approved",
+      approvedBy: approvedById,
+      approvedByName,
+      approvedAt: new Date(),
+      rejectionReason: null,
+    })
+    .where(eq(shiftLogs.id, shiftId));
+}
+
+/** Reject a single shift log with an optional reason. */
+export async function rejectShift(
+  shiftId: number,
+  approvedById: number,
+  approvedByName: string,
+  reason?: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db
+    .update(shiftLogs)
+    .set({
+      approvalStatus: "rejected",
+      approvedBy: approvedById,
+      approvedByName,
+      approvedAt: new Date(),
+      rejectionReason: reason ?? null,
+    })
+    .where(eq(shiftLogs.id, shiftId));
+}
+
+/** Bulk-approve multiple shifts at once. */
+export async function bulkApproveShifts(
+  shiftIds: number[],
+  approvedById: number,
+  approvedByName: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  if (shiftIds.length === 0) return;
+  await db
+    .update(shiftLogs)
+    .set({
+      approvalStatus: "approved",
+      approvedBy: approvedById,
+      approvedByName,
+      approvedAt: new Date(),
+      rejectionReason: null,
+    })
+    .where(sql`${shiftLogs.id} IN (${sql.join(shiftIds.map((id) => sql`${id}`), sql`, `)})`);
+}
+
+/** Count pending shifts (for badge/notification). */
+export async function countPendingShifts(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const [row] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(shiftLogs)
+    .where(
+      and(
+        eq(shiftLogs.approvalStatus, "pending"),
+        sql`${shiftLogs.clockOut} IS NOT NULL`
+      )
+    );
+  return Number(row?.count ?? 0);
+}

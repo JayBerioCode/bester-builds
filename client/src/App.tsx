@@ -24,6 +24,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAccess from "./pages/Settings/EmployeeAccess";
+import ShiftApproval from "./pages/ShiftApproval";
 
 function Router() {
   return (
@@ -54,6 +55,7 @@ function Router() {
             <Route path="/settings/payroll" component={PayrollReport} />
             <Route path="/settings/company" component={CompanyProfile} />
             <Route path="/settings/employee-access" component={EmployeeAccess} />
+            <Route path="/shifts/approval" component={ShiftApproval} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>

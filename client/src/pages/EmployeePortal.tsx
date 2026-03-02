@@ -21,6 +21,7 @@ import {
   TrendingUp,
   CalendarDays,
   CheckCircle2,
+  XCircle,
   Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -279,6 +280,7 @@ export default function EmployeePortal() {
                     <TableHead>Clock Out</TableHead>
                     <TableHead>Hours</TableHead>
                     <TableHead>Earnings</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -298,6 +300,24 @@ export default function EmployeePortal() {
                       </TableCell>
                       <TableCell className="font-medium text-green-700 dark:text-green-400">
                         {shift.earnings ? `R ${parseFloat(shift.earnings).toFixed(2)}` : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {shift.approvalStatus === "approved" ? (
+                          <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border-0 text-xs">
+                            <CheckCircle2 className="w-3 h-3 mr-1" /> Approved
+                          </Badge>
+                        ) : shift.approvalStatus === "rejected" ? (
+                          <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border-0 text-xs">
+                            <XCircle className="w-3 h-3 mr-1" /> Rejected
+                            {shift.rejectionReason && (
+                              <span className="ml-1 italic opacity-70" title={shift.rejectionReason}>(?)</span>
+                            )}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-amber-600 border-amber-300 text-xs">
+                            <Clock className="w-3 h-3 mr-1" /> Pending
+                          </Badge>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

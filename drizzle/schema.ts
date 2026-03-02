@@ -337,6 +337,13 @@ export const shiftLogs = mysqlTable("shift_logs", {
   /** Earnings = hoursWorked × employee.hourlyRate, stored at clock-out */
   earnings: decimal("earnings", { precision: 12, scale: 2 }),
   notes: text("notes"),
+  /** Approval workflow: pending → approved | rejected */
+  approvalStatus: mysqlEnum("approvalStatus", ["pending", "approved", "rejected"]).default("pending").notNull(),
+  /** ID of the local_users record who approved/rejected this shift */
+  approvedBy: int("approvedBy"),
+  approvedByName: varchar("approvedByName", { length: 255 }),
+  approvedAt: timestamp("approvedAt"),
+  rejectionReason: text("rejectionReason"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

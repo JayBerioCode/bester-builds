@@ -94,6 +94,12 @@ import {
   addToAllowlist,
   removeFromAllowlist,
   markAllowlistSignedUp,
+  // Shift approval
+  listShiftsForApproval,
+  approveShift,
+  rejectShift,
+  bulkApproveShifts,
+  countPendingShifts,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -664,6 +670,57 @@ const shiftsRouter = router({
       employeeId: z.number().optional(),
     }))
     .query(({ input }) => getTimesheetExport(input.from, input.to, input.employeeId)),
+
+  // ── Approval workflow ──────────────────────────────────────────────────────
+
+  /** List shifts for the approval queue (admin only). */
+  listForApproval: protectedProcedure
+    .input(z.object({
+      status: z.enum(["pending", "approved", "rejected"]).optional(),
+      employeeId: z.number().optional(),
+      limit: z.number().optional(),
+    }).optional())
+    .query(({ input }) => listShiftsForApproval(input ?? undefined)),
+
+  /** Count pending shifts (for sidebar badge). */
+  countPending: protectedProcedure
+    .query(() => countPendingShifts()),
+
+  /** Approve a single shift (admin only). */
+  approve: protectedProcedure
+    .input(z.object({ shiftId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const user = await findLocalUserById(session.localUserId);
+      await approveShift(input.shiftId, session.localUserId, user?.name ?? "Admin");
+      return { success: true };
+    }),
+
+  /** Reject a shift with an optional reason (admin only). */
+  reject: protectedProcedure
+    .input(z.object({ shiftId: z.number(), reason: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const user = await findLocalUserById(session.localUserId);
+      await rejectShift(input.shiftId, session.localUserId, user?.name ?? "Admin", input.reason);
+      return { success: true };
+    }),
+
+  /** Bulk-approve multiple shifts at once (admin only). */
+  bulkApprove: protectedProcedure
+    .input(z.object({ shiftIds: z.array(z.number()).min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const user = await findLocalUserById(session.localUserId);
+      await bulkApproveShifts(input.shiftIds, session.localUserId, user?.name ?? "Admin");
+      return { success: true, count: input.shiftIds.length };
+    }),
 });
 
 // ─── Job Costing Router ─────────────────────────────────────────────────────────

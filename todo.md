@@ -179,3 +179,17 @@
 - [x] Hide admin-only nav items from employee role
 - [x] Write vitest tests for new auth procedures
 - [x] Save checkpoint
+
+## Shift Approval Workflow
+- [x] Audit existing shift_logs schema and plan approval columns
+- [x] Add approvalStatus (pending|approved|rejected), approvedBy, approvedAt, rejectionReason columns to shift_logs
+- [x] Generate and apply migration SQL
+- [x] Add DB helpers: approveShift, rejectShift, listPendingShifts, listShiftsForApproval
+- [x] Add tRPC procedures: shifts.approve, shifts.reject, shifts.listForApproval
+- [x] Build ShiftApproval admin page with pending/approved/rejected tabs
+- [x] Add bulk approve action for multiple shifts at once
+- [x] Show rejection reason dialog when rejecting a shift
+- [x] Update Employee Portal shift history to show approval status badges
+- [x] Add Shift Approval sidebar nav link (Team group)
+- [x] Write vitest tests for approval procedures
+- [x] Save checkpoint
