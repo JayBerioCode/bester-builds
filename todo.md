@@ -92,4 +92,7 @@
 - [x] Add Download PDF button to Invoices page
 - [x] Style PDF: Bester.Builds header, client block, line items table, totals, payment info
 - [x] Write vitest test for the PDF route
-- [ ] Save checkpoint
+- [x] Save checkpoint
+
+## Bug Fixes
+- [x] Fix empty SelectItem value crash on /invoices page

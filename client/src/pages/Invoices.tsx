@@ -30,7 +30,7 @@ function InvoiceForm({ onSuccess, customers, orders }: { onSuccess: () => void; 
 
   const [form, setForm] = useState({
     customerId: "",
-    orderId: "",
+    orderId: "none",
     subtotal: "",
     taxRate: "15",
     discountAmount: "0",
@@ -49,7 +49,7 @@ function InvoiceForm({ onSuccess, customers, orders }: { onSuccess: () => void; 
     if (!form.customerId) { toast.error("Select a customer"); return; }
     create.mutate({
       customerId: parseInt(form.customerId),
-      orderId: form.orderId ? parseInt(form.orderId) : undefined,
+      orderId: form.orderId && form.orderId !== "none" ? parseInt(form.orderId) : undefined,
       subtotal: form.subtotal,
       taxRate: form.taxRate,
       taxAmount: tax.toFixed(2),
@@ -79,7 +79,7 @@ function InvoiceForm({ onSuccess, customers, orders }: { onSuccess: () => void; 
           <Select value={form.orderId} onValueChange={(v) => setForm({ ...form, orderId: v })}>
             <SelectTrigger><SelectValue placeholder="Select order..." /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="">No linked order</SelectItem>
+              <SelectItem value="none">No linked order</SelectItem>
               {orders.map((o) => <SelectItem key={o.id} value={String(o.id)}>{o.orderNumber} — {o.title}</SelectItem>)}
             </SelectContent>
           </Select>
