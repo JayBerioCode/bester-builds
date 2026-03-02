@@ -285,3 +285,21 @@ export const appointments = mysqlTable("appointments", {
 
 export type Appointment = typeof appointments.$inferSelect;
 export type InsertAppointment = typeof appointments.$inferInsert;
+
+// ─── Shift Logs (Clock In/Out) ────────────────────────────────────────────────
+export const shiftLogs = mysqlTable("shift_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  employeeId: int("employeeId").notNull(),
+  clockIn: timestamp("clockIn").notNull(),
+  clockOut: timestamp("clockOut"),
+  /** Computed and stored on clock-out: total hours worked as decimal (e.g. 7.5) */
+  hoursWorked: decimal("hoursWorked", { precision: 8, scale: 2 }),
+  /** Earnings = hoursWorked × employee.hourlyRate, stored at clock-out */
+  earnings: decimal("earnings", { precision: 12, scale: 2 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ShiftLog = typeof shiftLogs.$inferSelect;
+export type InsertShiftLog = typeof shiftLogs.$inferInsert;

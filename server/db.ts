@@ -13,6 +13,7 @@ import {
   orderItems,
   orders,
   payments,
+  shiftLogs,
   tasks,
   users,
 } from "../drizzle/schema";
@@ -468,4 +469,104 @@ export async function getTopCustomers() {
     company: customers.company,
     totalSpent: customers.totalSpent,
   }).from(customers).orderBy(desc(customers.totalSpent)).limit(10);
+}
+
+// ─── Shift Logs ───────────────────────────────────────────────────────────────
+
+/** Return all shifts for an employee, newest first */
+export async function getShiftLogs(employeeId?: number, limit = 100) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = employeeId ? [eq(shiftLogs.employeeId, employeeId)] : [];
+  return db
+    .select()
+    .from(shiftLogs)
+    .where(conditions.length ? and(...conditions) : undefined)
+    .orderBy(desc(shiftLogs.clockIn))
+    .limit(limit);
+}
+
+/** Return the active (not yet clocked-out) shift for an employee, if any */
+export async function getActiveShift(employeeId: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(shiftLogs)
+    .where(and(eq(shiftLogs.employeeId, employeeId), sql`${shiftLogs.clockOut} IS NULL`))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Clock an employee in — fails if they already have an open shift */
+export async function clockIn(employeeId: number, notes?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const existing = await getActiveShift(employeeId);
+  if (existing) throw new Error("Employee is already clocked in");
+  const [result] = await db.insert(shiftLogs).values({
+    employeeId,
+    clockIn: new Date(),
+    notes: notes ?? null,
+  });
+  const rows = await db.select().from(shiftLogs).where(eq(shiftLogs.id, (result as any).insertId)).limit(1);
+  return rows[0];
+}
+
+/** Clock an employee out — calculates hours worked and earnings */
+export async function clockOut(shiftId: number, employeeId: number, notes?: string) {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+
+  // Fetch the open shift
+  const rows = await db.select().from(shiftLogs).where(eq(shiftLogs.id, shiftId)).limit(1);
+  const shift = rows[0];
+  if (!shift) throw new Error("Shift not found");
+  if (shift.clockOut) throw new Error("Shift already closed");
+
+  // Fetch employee hourly rate
+  const empRows = await db.select().from(employees).where(eq(employees.id, employeeId)).limit(1);
+  const emp = empRows[0];
+  const hourlyRate = emp?.hourlyRate ? parseFloat(emp.hourlyRate as string) : 0;
+
+  const clockOutTime = new Date();
+  const msWorked = clockOutTime.getTime() - new Date(shift.clockIn).getTime();
+  const hoursWorked = Math.round((msWorked / (1000 * 60 * 60)) * 100) / 100; // 2dp
+  const earnings = Math.round(hoursWorked * hourlyRate * 100) / 100;
+
+  await db.update(shiftLogs).set({
+    clockOut: clockOutTime,
+    hoursWorked: hoursWorked.toFixed(2),
+    earnings: earnings.toFixed(2),
+    notes: notes ?? shift.notes,
+  }).where(eq(shiftLogs.id, shiftId));
+
+  const updated = await db.select().from(shiftLogs).where(eq(shiftLogs.id, shiftId)).limit(1);
+  return updated[0];
+}
+
+/** Aggregate shift summary per employee: total hours & earnings for a date range */
+export async function getShiftSummary(employeeId?: number, from?: Date, to?: Date) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions: any[] = [sql`${shiftLogs.clockOut} IS NOT NULL`];
+  if (employeeId) conditions.push(eq(shiftLogs.employeeId, employeeId));
+  if (from) conditions.push(gte(shiftLogs.clockIn, from));
+  if (to) conditions.push(lte(shiftLogs.clockIn, to));
+
+  return db
+    .select({
+      employeeId: shiftLogs.employeeId,
+      employeeName: employees.name,
+      employeeRole: employees.role,
+      hourlyRate: employees.hourlyRate,
+      totalShifts: sql<number>`count(${shiftLogs.id})`,
+      totalHours: sql<number>`ROUND(SUM(${shiftLogs.hoursWorked}), 2)`,
+      totalEarnings: sql<number>`ROUND(SUM(${shiftLogs.earnings}), 2)`,
+    })
+    .from(shiftLogs)
+    .leftJoin(employees, eq(shiftLogs.employeeId, employees.id))
+    .where(and(...conditions))
+    .groupBy(shiftLogs.employeeId, employees.name, employees.role, employees.hourlyRate)
+    .orderBy(desc(sql`SUM(${shiftLogs.earnings})`));
 }

@@ -15,6 +15,7 @@ import Tasks from "./pages/Tasks";
 import Payments from "./pages/Payments";
 import Analytics from "./pages/Analytics";
 import Scheduling from "./pages/Scheduling";
+import ClockIn from "./pages/ClockIn";
 
 function Router() {
   return (
@@ -30,6 +31,7 @@ function Router() {
         <Route path="/payments" component={Payments} />
         <Route path="/analytics" component={Analytics} />
         <Route path="/scheduling" component={Scheduling} />
+        <Route path="/clock-in" component={ClockIn} />
         <Route path="/404" component={NotFound} />
         <Route component={NotFound} />
       </Switch>

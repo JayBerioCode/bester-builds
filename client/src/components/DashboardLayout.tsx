@@ -29,6 +29,7 @@ import {
   Box,
   Calendar,
   ClipboardList,
+  Clock,
   CreditCard,
   LayoutDashboard,
   LogOut,
@@ -73,6 +74,7 @@ const menuGroups = [
     label: "Team",
     items: [
       { icon: Users2, label: "Employees", path: "/employees" },
+      { icon: Clock, label: "Clock In/Out", path: "/clock-in" },
     ],
   },
 ];

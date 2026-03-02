@@ -15,6 +15,13 @@
       "when": 1772444303681,
       "tag": "0001_skinny_smasher",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1772445715429,
+      "tag": "0002_gray_zzzax",
+      "breakpoints": true
     }
   ]
 }

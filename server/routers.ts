@@ -51,6 +51,11 @@ import {
   updateOrder,
   updatePayment,
   updateTask,
+  clockIn,
+  clockOut,
+  getActiveShift,
+  getShiftLogs,
+  getShiftSummary,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -508,6 +513,38 @@ const schedulingRouter = router({
     .mutation(({ input }) => deleteAppointment(input.id)),
 });
 
+// ─── Shifts Router (Clock In/Out) ───────────────────────────────────────────
+const shiftsRouter = router({
+  /** Get all shifts, optionally filtered by employee */
+  list: protectedProcedure
+    .input(z.object({ employeeId: z.number().optional(), limit: z.number().optional() }).optional())
+    .query(({ input }) => getShiftLogs(input?.employeeId, input?.limit)),
+
+  /** Get the currently active (open) shift for an employee */
+  activeShift: protectedProcedure
+    .input(z.object({ employeeId: z.number() }))
+    .query(({ input }) => getActiveShift(input.employeeId)),
+
+  /** Clock an employee in */
+  clockIn: protectedProcedure
+    .input(z.object({ employeeId: z.number(), notes: z.string().optional() }))
+    .mutation(({ input }) => clockIn(input.employeeId, input.notes)),
+
+  /** Clock an employee out */
+  clockOut: protectedProcedure
+    .input(z.object({ shiftId: z.number(), employeeId: z.number(), notes: z.string().optional() }))
+    .mutation(({ input }) => clockOut(input.shiftId, input.employeeId, input.notes)),
+
+  /** Aggregated summary: total hours & earnings per employee */
+  summary: protectedProcedure
+    .input(z.object({
+      employeeId: z.number().optional(),
+      from: z.date().optional(),
+      to: z.date().optional(),
+    }).optional())
+    .query(({ input }) => getShiftSummary(input?.employeeId, input?.from, input?.to)),
+});
+
 // ─── App Router ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -528,6 +565,7 @@ export const appRouter = router({
   payments: paymentsRouter,
   analytics: analyticsRouter,
   scheduling: schedulingRouter,
+  shifts: shiftsRouter,
 });
 
 export type AppRouter = typeof appRouter;

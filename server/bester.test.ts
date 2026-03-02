@@ -55,6 +55,11 @@ vi.mock("./db", () => ({
   getOrdersByStatus: vi.fn().mockResolvedValue([{ status: "in_production", count: 3 }, { status: "completed", count: 9 }]),
   getTopCustomers: vi.fn().mockResolvedValue([{ id: 1, name: "ABC Corp", totalRevenue: 15000 }]),
   getOrdersByStatusCount: vi.fn().mockResolvedValue([]),
+  getShiftLogs: vi.fn().mockResolvedValue([]),
+  getActiveShift: vi.fn().mockResolvedValue(null),
+  clockIn: vi.fn().mockResolvedValue({ id: 1, employeeId: 1, clockIn: new Date(), clockOut: null, hoursWorked: null, earnings: null, notes: null, createdAt: new Date(), updatedAt: new Date() }),
+  clockOut: vi.fn().mockResolvedValue({ id: 1, employeeId: 1, clockIn: new Date(Date.now() - 3600000), clockOut: new Date(), hoursWorked: "1.00", earnings: "75.00", notes: null, createdAt: new Date(), updatedAt: new Date() }),
+  getShiftSummary: vi.fn().mockResolvedValue([{ employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", hourlyRate: "75.00", totalShifts: 5, totalHours: 40, totalEarnings: 3000 }]),
 }));
 
 // ─── Auth context factory ─────────────────────────────────────────────────────
@@ -310,5 +315,72 @@ describe("scheduling.create", () => {
     });
     expect(result).toBeDefined();
     expect(result.title).toBe("Client Meeting");
+  });
+});
+
+// ─── Shifts (Clock In/Out) Tests ──────────────────────────────────────────────
+// Extend the top-level vi.mock to include shift helpers
+// (The mock at the top of this file already covers all db exports via vi.mock("./db", ...))
+
+describe("shifts.list", () => {
+  it("returns an array of shift logs", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.list();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("accepts an optional employeeId filter", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.list({ employeeId: 1 });
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+describe("shifts.activeShift", () => {
+  it("returns null when employee has no active shift", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.activeShift({ employeeId: 1 });
+    expect(result).toBeNull();
+  });
+});
+
+describe("shifts.clockIn", () => {
+  it("clocks an employee in and returns the new shift record", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.clockIn({ employeeId: 1 });
+    expect(result).toBeDefined();
+    expect(result?.employeeId).toBe(1);
+  });
+
+  it("accepts optional notes on clock-in", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.clockIn({ employeeId: 2, notes: "Morning shift" });
+    expect(result).toBeDefined();
+  });
+});
+
+describe("shifts.clockOut", () => {
+  it("clocks an employee out and returns the completed shift", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.clockOut({ shiftId: 1, employeeId: 1 });
+    expect(result).toBeDefined();
+  });
+});
+
+describe("shifts.summary", () => {
+  it("returns aggregated earnings summary for all employees", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.summary();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("accepts optional employeeId and date range filters", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.summary({
+      employeeId: 1,
+      from: new Date("2026-01-01"),
+      to: new Date("2026-12-31"),
+    });
+    expect(Array.isArray(result)).toBe(true);
   });
 });

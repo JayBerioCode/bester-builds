@@ -50,3 +50,13 @@
 - [x] Write vitest tests for core routers (23 tests passing)
 - [x] Save checkpoint
 - [x] Deliver to user
+
+## Clock-In/Out Feature
+- [x] Add shift_logs table to database schema (employeeId, clockIn, clockOut, hoursWorked, earnings, notes)
+- [x] Generate and apply migration SQL
+- [x] Add DB query helpers for shift logs
+- [x] Add tRPC router: clockIn, clockOut, listShifts, getActiveShift, getShiftSummary
+- [x] Build ClockIn page: clock-in/out panel, active shift timer, shift history table, daily/weekly earnings summary
+- [x] Add ClockIn route and sidebar navigation entry
+- [x] Write vitest tests for clock-in/out procedures
+- [x] Save checkpoint
