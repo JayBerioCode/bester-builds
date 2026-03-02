@@ -27,6 +27,7 @@ import EmployeeAccess from "./pages/Settings/EmployeeAccess";
 import ShiftApproval from "./pages/ShiftApproval";
 import NotificationCentre from "./pages/NotificationCentre";
 import JobCardGenerator from "./pages/JobCardGenerator";
+import { PwaInstallBanner } from "./components/PwaInstallBanner";
 
 function Router() {
   return (
@@ -76,6 +77,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <PwaInstallBanner />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

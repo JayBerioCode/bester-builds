@@ -282,3 +282,13 @@
 - [x] Applied dual-auth fix to notifications.listAll
 - [x] Confirmed all other LOCAL_AUTH_COOKIE guards already have the isOAuthAdmin check
 - [x] Save checkpoint
+
+## Progressive Web App (PWA)
+- [x] Generate branded app icons (512x512 and 192x192) and upload to CDN
+- [x] Create /client/public/manifest.json with name, icons, theme_color, display: standalone
+- [x] Create /client/public/sw.js service worker (cache-first for static assets, network-first for API)
+- [x] Add <link rel="manifest"> and all mobile meta tags to client/index.html
+- [x] Add apple-touch-icon and apple-mobile-web-app meta tags for iOS
+- [x] Register service worker in client/src/main.tsx
+- [x] Add PwaInstallBanner component (Android native prompt + iOS manual instructions)
+- [x] Save checkpoint
