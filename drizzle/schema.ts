@@ -220,6 +220,8 @@ export const invoices = mysqlTable("invoices", {
   invoiceNumber: varchar("invoiceNumber", { length: 50 }).notNull().unique(),
   orderId: int("orderId"),
   customerId: int("customerId").notNull(),
+  /** Purchase order number provided by the customer */
+  poNumber: varchar("poNumber", { length: 100 }),
   status: mysqlEnum("status", ["draft", "sent", "viewed", "partial", "paid", "overdue", "cancelled"]).default("draft").notNull(),
   subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
   taxRate: decimal("taxRate", { precision: 5, scale: 2 }).default("0.00"),
@@ -446,3 +448,43 @@ export const employeeNotifications = mysqlTable("employee_notifications", {
 });
 export type EmployeeNotification = typeof employeeNotifications.$inferSelect;
 export type InsertEmployeeNotification = typeof employeeNotifications.$inferInsert;
+
+// ─── Job Cards ────────────────────────────────────────────────────────────────
+export const jobCards = mysqlTable("job_cards", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Job card number e.g. JC-0001 */
+  jobCardNumber: varchar("jobCardNumber", { length: 50 }).notNull().unique(),
+  /** The invoice this job card was generated from */
+  invoiceId: int("invoiceId").notNull(),
+  /** Purchase order number from the invoice */
+  poNumber: varchar("poNumber", { length: 100 }).notNull(),
+  /** Short title for the job */
+  jobTitle: varchar("jobTitle", { length: 255 }).notNull(),
+  /** Customer name (denormalised for quick display) */
+  customerName: varchar("customerName", { length: 255 }),
+  /** Employee assigned to this job */
+  assignedTo: int("assignedTo"),
+  assignedToName: varchar("assignedToName", { length: 255 }),
+  /** Due date for job completion */
+  dueDate: timestamp("dueDate"),
+  /** Print specifications: type, dimensions, material, finishing, quantity */
+  printType: varchar("printType", { length: 100 }),
+  width: decimal("width", { precision: 8, scale: 2 }),
+  height: decimal("height", { precision: 8, scale: 2 }),
+  dimensionUnit: varchar("dimensionUnit", { length: 10 }).default("m"),
+  quantity: int("quantity").default(1),
+  material: varchar("material", { length: 255 }),
+  finishing: varchar("finishing", { length: 255 }),
+  /** Special instructions for the production team */
+  instructions: text("instructions"),
+  /** Internal notes */
+  notes: text("notes"),
+  /** File/artwork URL */
+  fileUrl: text("fileUrl"),
+  /** Job card status */
+  status: mysqlEnum("status", ["pending", "in_progress", "completed", "cancelled"]).default("pending").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type JobCard = typeof jobCards.$inferSelect;
+export type InsertJobCard = typeof jobCards.$inferInsert;

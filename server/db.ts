@@ -22,9 +22,12 @@ import {
   companyProfile,
   localUsers,
   employeeAllowlist,
+  jobCards,
   type LocalUser,
   type InsertLocalUser,
   type EmployeeAllowlist,
+  type JobCard,
+  type InsertJobCard,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1723,4 +1726,99 @@ export async function findLocalUserByEmployeeId(employeeId: number): Promise<Loc
     .where(eq(localUsers.employeeId, employeeId))
     .limit(1);
   return rows[0] ?? null;
+}
+
+// ─── Job Cards ─────────────────────────────────────────────────────────────────
+
+/** Generate a sequential job card number like JC-0042. */
+async function nextJobCardNumber(): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(jobCards);
+  const next = (Number(row?.count ?? 0) + 1).toString().padStart(4, "0");
+  return `JC-${next}`;
+}
+
+/** List all invoices that have a poNumber set (for the job card generator picker). */
+export async function listInvoicesWithPO() {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      invoice: invoices,
+      customer: customers,
+      order: orders,
+    })
+    .from(invoices)
+    .leftJoin(customers, eq(invoices.customerId, customers.id))
+    .leftJoin(orders, eq(invoices.orderId, orders.id))
+    .where(sql`${invoices.poNumber} IS NOT NULL AND ${invoices.poNumber} != ''`)
+    .orderBy(desc(invoices.createdAt));
+  return rows;
+}
+
+/** Create a new job card from an invoice. */
+export async function createJobCard(data: Omit<InsertJobCard, "jobCardNumber">): Promise<JobCard> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const jobCardNumber = await nextJobCardNumber();
+  await db.insert(jobCards).values({ ...data, jobCardNumber });
+  const [created] = await db
+    .select()
+    .from(jobCards)
+    .where(eq(jobCards.jobCardNumber, jobCardNumber))
+    .limit(1);
+  return created;
+}
+
+/** Get a single job card by ID with linked invoice and customer data. */
+export async function getJobCard(id: number) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select({
+      jobCard: jobCards,
+      invoice: invoices,
+      customer: customers,
+    })
+    .from(jobCards)
+    .leftJoin(invoices, eq(jobCards.invoiceId, invoices.id))
+    .leftJoin(customers, eq(invoices.customerId, customers.id))
+    .where(eq(jobCards.id, id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** List all job cards with invoice and customer info. */
+export async function listJobCards(status?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      jobCard: jobCards,
+      invoice: invoices,
+      customer: customers,
+    })
+    .from(jobCards)
+    .leftJoin(invoices, eq(jobCards.invoiceId, invoices.id))
+    .leftJoin(customers, eq(invoices.customerId, customers.id))
+    .where(status ? eq(jobCards.status, status as any) : undefined)
+    .orderBy(desc(jobCards.createdAt));
+  return rows;
+}
+
+/** Update a job card's fields. */
+export async function updateJobCard(id: number, data: Partial<InsertJobCard>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(jobCards).set(data).where(eq(jobCards.id, id));
+}
+
+/** Update invoice poNumber. */
+export async function updateInvoicePoNumber(invoiceId: number, poNumber: string) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.update(invoices).set({ poNumber }).where(eq(invoices.id, invoiceId));
 }

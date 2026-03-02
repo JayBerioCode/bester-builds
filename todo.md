@@ -205,3 +205,17 @@
 - [x] Add notification centre page in admin sidebar (Team group)
 - [x] Write vitest tests for notification procedures
 - [x] Save checkpoint
+
+## Job Card Generator
+- [x] Audit invoice schema and PDF infrastructure
+- [x] Add poNumber field to invoices table
+- [x] Add job_cards table (invoiceId, poNumber, jobTitle, assignedTo, dueDate, instructions, status, printSpecs, notes)
+- [x] Generate and apply migration SQL
+- [x] Add DB helpers: createJobCard, getJobCard, listJobCards, updateJobCard, listInvoicesWithPO, updateInvoicePoNumber
+- [x] Add tRPC procedures: jobCards.listInvoicesWithPO, jobCards.create, jobCards.get, jobCards.list, jobCards.update, jobCards.setInvoicePO
+- [x] Build server-side PDF generator for job cards (jobCardPdf.ts) with branded layout
+- [x] Add /api/job-cards/:id/pdf PDF download route
+- [x] Build Job Card Generator page with two-step creation dialog, tabbed list, status management
+- [x] Add Job Cards nav item to Operations group in sidebar
+- [x] Write vitest tests for job card procedures
+- [x] Save checkpoint

@@ -75,6 +75,7 @@ const menuGroups = [
       { icon: Box, label: "Inventory", path: "/inventory" },
       { icon: CheckSquare, label: "Tasks", path: "/tasks" },
       { icon: Calendar, label: "Scheduling", path: "/scheduling" },
+      { icon: Printer, label: "Job Cards", path: "/job-cards" },
     ],
   },
   {

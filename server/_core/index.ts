@@ -7,9 +7,10 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { getInvoiceForPDF, getPayrollReport, getCompanyProfile } from "../db";
+import { getInvoiceForPDF, getPayrollReport, getCompanyProfile, getJobCard } from "../db";
 import { generateInvoicePDF } from "../pdf";
 import { generatePayrollPDF } from "../payrollPdf";
+import { generateJobCardPDF } from "../jobCardPdf";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -93,6 +94,34 @@ async function startServer() {
     } catch (err) {
       console.error("[Payroll PDF] Error:", err);
       res.status(500).json({ error: "Failed to generate payroll PDF" });
+    }
+  });
+
+  // Job Card PDF download route
+  app.get("/api/job-cards/:id/pdf", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ error: "Invalid job card ID" });
+        return;
+      }
+      const [data, company] = await Promise.all([getJobCard(id), getCompanyProfile()]);
+      if (!data || !data.jobCard) {
+        res.status(404).json({ error: "Job card not found" });
+        return;
+      }
+      generateJobCardPDF(
+        {
+          jobCard: data.jobCard,
+          invoice: data.invoice ?? { invoiceNumber: "—", total: "0" },
+          customer: data.customer ?? { name: "Unknown" },
+          company: company ?? undefined,
+        },
+        res
+      );
+    } catch (err) {
+      console.error("[Job Card PDF] Error:", err);
+      res.status(500).json({ error: "Failed to generate job card PDF" });
     }
   });
 

@@ -26,6 +26,7 @@ import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAccess from "./pages/Settings/EmployeeAccess";
 import ShiftApproval from "./pages/ShiftApproval";
 import NotificationCentre from "./pages/NotificationCentre";
+import JobCardGenerator from "./pages/JobCardGenerator";
 
 function Router() {
   return (
@@ -58,6 +59,7 @@ function Router() {
             <Route path="/settings/employee-access" component={EmployeeAccess} />
             <Route path="/shifts/approval" component={ShiftApproval} />
             <Route path="/notifications" component={NotificationCentre} />
+            <Route path="/job-cards" component={JobCardGenerator} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>

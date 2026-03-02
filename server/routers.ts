@@ -106,6 +106,13 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
   listAllNotifications,
+  // Job Cards
+  listInvoicesWithPO,
+  createJobCard,
+  getJobCard,
+  listJobCards,
+  updateJobCard,
+  updateInvoicePoNumber,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -1180,6 +1187,101 @@ const notificationsRouter = router({
     }),
 });
 
+// ─── Job Cards Router ───────────────────────────────────────────────────────
+const jobCardsRouter = router({
+  /** List all invoices that have a PO number set. */
+  listInvoicesWithPO: protectedProcedure.query(() => listInvoicesWithPO()),
+
+  /** List all job cards, optionally filtered by status. */
+  list: protectedProcedure
+    .input(z.object({ status: z.string().optional() }).optional())
+    .query(({ input }) => listJobCards(input?.status)),
+
+  /** Get a single job card by ID. */
+  get: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ input }) => getJobCard(input.id)),
+
+  /** Create a new job card from an invoice. */
+  create: protectedProcedure
+    .input(z.object({
+      invoiceId: z.number(),
+      poNumber: z.string().min(1),
+      jobTitle: z.string().min(1),
+      customerName: z.string().optional(),
+      assignedTo: z.number().optional(),
+      assignedToName: z.string().optional(),
+      dueDate: z.string().optional(),
+      printType: z.string().optional(),
+      width: z.string().optional(),
+      height: z.string().optional(),
+      dimensionUnit: z.string().optional(),
+      quantity: z.number().optional(),
+      material: z.string().optional(),
+      finishing: z.string().optional(),
+      instructions: z.string().optional(),
+      notes: z.string().optional(),
+      fileUrl: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return createJobCard({
+        invoiceId: input.invoiceId,
+        poNumber: input.poNumber,
+        jobTitle: input.jobTitle,
+        customerName: input.customerName ?? null,
+        assignedTo: input.assignedTo ?? null,
+        assignedToName: input.assignedToName ?? null,
+        dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        printType: input.printType ?? null,
+        width: input.width ?? null,
+        height: input.height ?? null,
+        dimensionUnit: input.dimensionUnit ?? "m",
+        quantity: input.quantity ?? 1,
+        material: input.material ?? null,
+        finishing: input.finishing ?? null,
+        instructions: input.instructions ?? null,
+        notes: input.notes ?? null,
+        fileUrl: input.fileUrl ?? null,
+        status: "pending",
+      });
+    }),
+
+  /** Update a job card's status or fields. */
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
+      assignedTo: z.number().optional().nullable(),
+      assignedToName: z.string().optional().nullable(),
+      dueDate: z.string().optional().nullable(),
+      instructions: z.string().optional().nullable(),
+      notes: z.string().optional().nullable(),
+      printType: z.string().optional().nullable(),
+      width: z.string().optional().nullable(),
+      height: z.string().optional().nullable(),
+      dimensionUnit: z.string().optional().nullable(),
+      quantity: z.number().optional().nullable(),
+      material: z.string().optional().nullable(),
+      finishing: z.string().optional().nullable(),
+    }))
+    .mutation(async ({ input }) => {
+      const { id, dueDate, ...rest } = input;
+      await updateJobCard(id, {
+        ...rest,
+        dueDate: dueDate ? new Date(dueDate) : undefined,
+      });
+      return { success: true };
+    }),
+
+  /** Set or update the PO number on an invoice. */
+  setInvoicePO: protectedProcedure
+    .input(z.object({ invoiceId: z.number(), poNumber: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      await updateInvoicePoNumber(input.invoiceId, input.poNumber);
+      return { success: true };
+    }),
+});
+
 // ─── App Router ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -1209,6 +1311,7 @@ export const appRouter = router({
   allowlist: allowlistRouter,
   employeePortal: employeePortalRouter,
   notifications: notificationsRouter,
+  jobCards: jobCardsRouter,
 });
 
 export type AppRouter = typeof appRouter;
