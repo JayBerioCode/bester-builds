@@ -13,12 +13,31 @@ interface PayrollEmployee {
   avgHoursPerShift: number;
 }
 
+interface CompanyProfile {
+  companyName?: string | null;
+  tagline?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  vatNumber?: string | null;
+  bankName?: string | null;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  branchCode?: string | null;
+  website?: string | null;
+}
+
 export function generatePayrollPDF(
   res: Response,
   employees: PayrollEmployee[],
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  company?: CompanyProfile
 ) {
+  const companyName = company?.companyName || "Bester.Builds";
+  const tagline = company?.tagline || "Large Format Printing";
   const doc = new PDFDocument({ margin: 50, size: "A4" });
 
   res.setHeader("Content-Type", "application/pdf");
@@ -40,8 +59,8 @@ export function generatePayrollPDF(
   // ── Header banner ──────────────────────────────────────────────────────────
   doc.rect(0, 0, doc.page.width, 100).fill(purple);
 
-  doc.fontSize(26).fillColor(white).font("Helvetica-Bold").text("Bester.Builds", 50, 28);
-  doc.fontSize(11).fillColor("#C4B5FD").font("Helvetica").text("Large Format Printing — Payroll Report", 50, 58);
+  doc.fontSize(26).fillColor(white).font("Helvetica-Bold").text(companyName, 50, 28);
+  doc.fontSize(11).fillColor("#C4B5FD").font("Helvetica").text(`${tagline} — Payroll Report`, 50, 58);
 
   // Date range badge
   const periodText = `${startDate.toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" })} – ${endDate.toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" })}`;
@@ -150,7 +169,7 @@ export function generatePayrollPDF(
   const footerY = doc.page.height - 50;
   doc.moveTo(50, footerY - 10).lineTo(50 + pageWidth, footerY - 10).strokeColor("#E5E7EB").lineWidth(0.5).stroke();
   doc.fontSize(8).fillColor(midGray).font("Helvetica").text(
-    `Generated on ${new Date().toLocaleString("en-ZA")} · Bester.Builds Large Format Printing · Confidential`,
+    `Generated on ${new Date().toLocaleString("en-ZA")} · ${companyName} ${tagline} · Confidential`,
     50,
     footerY,
     { align: "center", width: pageWidth }

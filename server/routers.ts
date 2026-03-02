@@ -76,6 +76,8 @@ import {
   deleteJobUsageEntry,
   getJobCostingReport,
   getPayrollReport,
+  getCompanyProfile,
+  upsertCompanyProfile,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -731,6 +733,38 @@ const pricingRouter = router({
 });
 
 // ─── Payroll Router ─────────────────────────────────────────────────────────
+// ─── Company Profile Router ─────────────────────────────────────────────────
+const companyRouter = router({
+  getProfile: protectedProcedure.query(() => getCompanyProfile()),
+
+  updateProfile: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).optional(),
+        tagline: z.string().optional(),
+        email: z.string().email().optional().or(z.literal("")),
+        phone: z.string().optional(),
+        address: z.string().optional(),
+        vatNumber: z.string().optional(),
+        regNumber: z.string().optional(),
+        website: z.string().optional(),
+        bankName: z.string().optional(),
+        accountHolder: z.string().optional(),
+        accountNumber: z.string().optional(),
+        branchCode: z.string().optional(),
+        accountType: z.string().optional(),
+        paymentReference: z.string().optional(),
+        invoiceTerms: z.string().optional(),
+      })
+    )
+    .mutation(({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Admin access required" });
+      }
+      return upsertCompanyProfile(input);
+    }),
+});
+
 const payrollRouter = router({
   report: protectedProcedure
     .input(
@@ -769,6 +803,7 @@ export const appRouter = router({
   pricing: pricingRouter,
   jobCosting: jobCostingRouter,
   payroll: payrollRouter,
+  company: companyRouter,
 });
 
 export type AppRouter = typeof appRouter;

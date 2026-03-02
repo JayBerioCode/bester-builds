@@ -19,6 +19,7 @@ import {
   users,
   pricingRates,
   inventoryJobUsage,
+  companyProfile,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1252,4 +1253,28 @@ export async function getPayrollReport(startDate: Date, endDate: Date) {
         ? parseFloat((emp.totalHours / emp.totalShifts).toFixed(2))
         : 0,
   }));
+}
+
+// ─── Company Profile ─────────────────────────────────────────────────────────
+export async function getCompanyProfile() {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(companyProfile).limit(1);
+  return rows[0] ?? null;
+}
+
+export async function upsertCompanyProfile(
+  data: Partial<Omit<typeof companyProfile.$inferInsert, "id" | "updatedAt">>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  // Always update row id=1 (singleton pattern)
+  const existing = await db.select({ id: companyProfile.id }).from(companyProfile).limit(1);
+  if (existing.length === 0) {
+    await db.insert(companyProfile).values({ name: "Bester.Builds", ...data });
+  } else {
+    await db.update(companyProfile).set(data).where(eq(companyProfile.id, existing[0].id));
+  }
+  const updated = await db.select().from(companyProfile).limit(1);
+  return updated[0];
 }

@@ -1,0 +1,20 @@
+CREATE TABLE `company_profile` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`name` varchar(255) NOT NULL DEFAULT 'Bester.Builds',
+	`tagline` varchar(255) DEFAULT 'Large Format Printing Specialists',
+	`email` varchar(320),
+	`phone` varchar(64),
+	`address` text,
+	`vatNumber` varchar(64),
+	`regNumber` varchar(64),
+	`website` varchar(255),
+	`bankName` varchar(128),
+	`accountHolder` varchar(255),
+	`accountNumber` varchar(64),
+	`branchCode` varchar(32),
+	`accountType` varchar(64),
+	`paymentReference` text,
+	`invoiceTerms` text,
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `company_profile_id` PRIMARY KEY(`id`)
+);

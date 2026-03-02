@@ -106,6 +106,8 @@ vi.mock("./db", () => ({
     { employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", department: "Production", hourlyRate: "75.00", totalShifts: 10, totalHours: 80, totalEarnings: 6000, avgHoursPerShift: 8 },
     { employeeId: 2, employeeName: "Jane Smith", employeeRole: "designer", department: "Design", hourlyRate: "90.00", totalShifts: 8, totalHours: 64, totalEarnings: 5760, avgHoursPerShift: 8 },
   ]),
+  getCompanyProfile: vi.fn().mockResolvedValue({ id: 1, companyName: "Bester.Builds", tagline: "Large Format Printing", email: "info@bester.builds", phone: "+27 11 000 0000", address: "123 Print Street", city: "Johannesburg", country: "South Africa", vatNumber: "4123456789", bankName: "FNB", accountName: "Bester Builds", accountNumber: "62123456789", branchCode: "250655", website: "bester.builds", updatedAt: new Date() }),
+  upsertCompanyProfile: vi.fn().mockResolvedValue(undefined),
   getJobCostingReport: vi.fn().mockResolvedValue([
     { orderId: 1, orderNumber: "BB-001", title: "Banner Print", status: "in_production", customerId: 1, customerName: "Test Client", quotedTotal: 1150, actualCost: 450, grossMargin: 700, marginPct: 60.87, hasMaterialsLogged: true },
     { orderId: 2, orderNumber: "BB-002", title: "Vinyl Wrap", status: "quote", customerId: 1, customerName: "Test Client", quotedTotal: 800, actualCost: 0, grossMargin: 0, marginPct: null, hasMaterialsLogged: false },
@@ -879,5 +881,45 @@ describe("payroll.report", () => {
     await expect(
       caller.payroll.report({} as { startDate: Date; endDate: Date })
     ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+});
+
+// ─── Company Profile Tests ─────────────────────────────────────────────────
+describe("company.getProfile", () => {
+  it("returns the company profile", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.company.getProfile();
+    expect(result).toBeDefined();
+  });
+
+  it("rejects unauthenticated access", async () => {
+    const ctx = { ...makeCtx(), user: null };
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.company.getProfile()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
+
+describe("company.updateProfile", () => {
+  it("saves company profile (admin)", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    // updateProfile returns undefined (upsertCompanyProfile mock returns undefined)
+    const result = await caller.company.updateProfile({
+      name: "Bester.Builds",
+      email: "info@bester.builds",
+      phone: "+27 11 000 0000",
+      vatNumber: "4123456789",
+      bankName: "FNB",
+      accountHolder: "Bester Builds (Pty) Ltd",
+      accountNumber: "62123456789",
+      branchCode: "250655",
+    });
+    expect(result).toBeUndefined();
+  });
+
+  it("rejects non-admin users", async () => {
+    const caller = appRouter.createCaller(makeCtx("user"));
+    await expect(
+      caller.company.updateProfile({ name: "Hack" })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

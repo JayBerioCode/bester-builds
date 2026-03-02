@@ -346,3 +346,37 @@ export const inventoryJobUsage = mysqlTable("inventory_job_usage", {
 });
 export type InventoryJobUsage = typeof inventoryJobUsage.$inferSelect;
 export type InsertInventoryJobUsage = typeof inventoryJobUsage.$inferInsert;
+
+// ─── Company Profile ─────────────────────────────────────────────────────────
+export const companyProfile = mysqlTable("company_profile", {
+  id: int("id").autoincrement().primaryKey(),
+  /** Company display name */
+  name: varchar("name", { length: 255 }).notNull().default("Bester.Builds"),
+  /** Tagline shown on PDFs */
+  tagline: varchar("tagline", { length: 255 }).default("Large Format Printing Specialists"),
+  /** Primary contact email */
+  email: varchar("email", { length: 320 }),
+  /** Primary phone number */
+  phone: varchar("phone", { length: 64 }),
+  /** Physical / postal address (multi-line) */
+  address: text("address"),
+  /** VAT / tax registration number */
+  vatNumber: varchar("vatNumber", { length: 64 }),
+  /** Company registration number */
+  regNumber: varchar("regNumber", { length: 64 }),
+  /** Website URL */
+  website: varchar("website", { length: 255 }),
+  // ── Banking details ──────────────────────────────────────────────────────
+  bankName: varchar("bankName", { length: 128 }),
+  accountHolder: varchar("accountHolder", { length: 255 }),
+  accountNumber: varchar("accountNumber", { length: 64 }),
+  branchCode: varchar("branchCode", { length: 32 }),
+  accountType: varchar("accountType", { length: 64 }),
+  /** Optional payment reference instructions shown on invoices */
+  paymentReference: text("paymentReference"),
+  /** Invoice footer / terms text */
+  invoiceTerms: text("invoiceTerms"),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type CompanyProfile = typeof companyProfile.$inferSelect;
+export type InsertCompanyProfile = typeof companyProfile.$inferInsert;

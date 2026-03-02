@@ -7,7 +7,7 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { getInvoiceForPDF, getPayrollReport } from "../db";
+import { getInvoiceForPDF, getPayrollReport, getCompanyProfile } from "../db";
 import { generateInvoicePDF } from "../pdf";
 import { generatePayrollPDF } from "../payrollPdf";
 
@@ -46,7 +46,7 @@ async function startServer() {
         res.status(400).json({ error: "Invalid invoice ID" });
         return;
       }
-      const data = await getInvoiceForPDF(id);
+      const [data, company] = await Promise.all([getInvoiceForPDF(id), getCompanyProfile()]);
       if (!data || !data.customer) {
         res.status(404).json({ error: "Invoice not found" });
         return;
@@ -64,6 +64,7 @@ async function startServer() {
           customer: data.customer,
           order: data.order ?? null,
           lineItems: data.lineItems,
+          company: company ?? undefined,
         },
         res
       );
@@ -87,8 +88,8 @@ async function startServer() {
         res.status(400).json({ error: "Invalid date format" });
         return;
       }
-      const employees = await getPayrollReport(start, end);
-      generatePayrollPDF(res, employees, start, end);
+      const [employees, company] = await Promise.all([getPayrollReport(start, end), getCompanyProfile()]);
+      generatePayrollPDF(res, employees, start, end, company ?? undefined);
     } catch (err) {
       console.error("[Payroll PDF] Error:", err);
       res.status(500).json({ error: "Failed to generate payroll PDF" });

@@ -18,7 +18,24 @@ const PAGE = { margins: { top: 50, bottom: 50, left: 50, right: 50 } };
 const W = 595 - PAGE.margins.left - PAGE.margins.right; // usable width
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+export interface CompanyProfile {
+  companyName?: string | null;
+  tagline?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  city?: string | null;
+  country?: string | null;
+  vatNumber?: string | null;
+  bankName?: string | null;
+  accountName?: string | null;
+  accountNumber?: string | null;
+  branchCode?: string | null;
+  website?: string | null;
+}
+
 export interface InvoiceData {
+  company?: CompanyProfile;
   invoice: {
     invoiceNumber: string;
     status: string;
@@ -83,12 +100,24 @@ function statusColor(status: string): string {
 
 // ─── Main Generator ───────────────────────────────────────────────────────────
 export function generateInvoicePDF(data: InvoiceData, res: Response): void {
+  const co = data.company;
+  const companyName = co?.companyName || "Bester.Builds";
+  const tagline = co?.tagline || "Large Format Printing";
+  const bankName = co?.bankName || "FNB";
+  const accountName = co?.accountName || companyName;
+  const accountNumber = co?.accountNumber || "62XXXXXXXX";
+  const branchCode = co?.branchCode || "250655";
+  const contactEmail = co?.email || "accounts@bester.builds";
+  const contactPhone = co?.phone || "+27 XX XXX XXXX";
+  const website = co?.website || "bester.builds";
+  const vatNumber = co?.vatNumber;
+
   const doc = new PDFDocument({
     size: "A4",
     margins: PAGE.margins,
     info: {
       Title: `Invoice ${data.invoice.invoiceNumber}`,
-      Author: "Bester.Builds",
+      Author: companyName,
       Subject: `Invoice for ${data.customer.name}`,
     },
   });
@@ -112,14 +141,14 @@ export function generateInvoicePDF(data: InvoiceData, res: Response): void {
     .fillColor(BRAND.white)
     .fontSize(22)
     .font("Helvetica-Bold")
-    .text("Bester.Builds", L + 14, y + 12);
+    .text(companyName, L + 14, y + 12);
 
   // Tagline
   doc
     .fillColor("#c4b5fd")
     .fontSize(9)
     .font("Helvetica")
-    .text("Large Format Printing", L + 14, y + 37);
+    .text(tagline, L + 14, y + 37);
 
   // INVOICE label (right-aligned)
   doc
@@ -305,8 +334,10 @@ export function generateInvoicePDF(data: InvoiceData, res: Response): void {
   doc.rect(L, y, W, 58).fill(BRAND.primaryLight);
   doc.fillColor(BRAND.primary).fontSize(9).font("Helvetica-Bold").text("PAYMENT INFORMATION", L + 12, y + 10);
   doc.fillColor(BRAND.text).fontSize(8).font("Helvetica");
-  doc.text("Bank: FNB  |  Account Name: Bester.Builds  |  Account No: 62XXXXXXXX  |  Branch Code: 250655", L + 12, y + 24, { width: W - 24 });
-  doc.text("Reference: " + data.invoice.invoiceNumber + "  |  Email: accounts@bester.builds  |  Tel: +27 XX XXX XXXX", L + 12, y + 38, { width: W - 24 });
+  const bankLine = `Bank: ${bankName}  |  Account Name: ${accountName}  |  Account No: ${accountNumber}  |  Branch Code: ${branchCode}${vatNumber ? `  |  VAT: ${vatNumber}` : ""}`;
+  const refLine = `Reference: ${data.invoice.invoiceNumber}  |  Email: ${contactEmail}  |  Tel: ${contactPhone}`;
+  doc.text(bankLine, L + 12, y + 24, { width: W - 24 });
+  doc.text(refLine, L + 12, y + 38, { width: W - 24 });
 
   // ── Footer ───────────────────────────────────────────────────────────────────
   const footerY = 842 - PAGE.margins.bottom - 20;
@@ -316,7 +347,7 @@ export function generateInvoicePDF(data: InvoiceData, res: Response): void {
     .fontSize(8)
     .font("Helvetica")
     .text(
-      `Thank you for your business! | bester.builds | Generated ${format(new Date(), "dd MMM yyyy HH:mm")}`,
+      `Thank you for your business! | ${website} | Generated ${format(new Date(), "dd MMM yyyy HH:mm")}`,
       L,
       footerY + 6,
       { width: W, align: "center" }

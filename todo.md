@@ -152,3 +152,15 @@
 - [x] Add PayrollReport route and sidebar nav entry under Settings
 - [x] Write vitest tests for payroll.report procedure
 - [x] Save checkpoint
+
+## Company Profile Settings Page
+- [x] Add company_profile table to schema (name, tagline, email, phone, address, vatNumber, bankName, accountHolder, accountNumber, branchCode, accountType, website)
+- [x] Generate and apply migration SQL
+- [x] Add DB helpers: getCompanyProfile, upsertCompanyProfile
+- [x] Add tRPC procedures: company.getProfile, company.updateProfile (admin-only)
+- [x] Build CompanyProfile settings page with grouped form sections
+- [x] Add CompanyProfile route (/settings/company) and sidebar nav entry
+- [x] Wire company profile into invoice PDF generator
+- [x] Wire company profile into payroll PDF generator
+- [x] Write vitest tests for company profile procedures
+- [x] Save checkpoint
