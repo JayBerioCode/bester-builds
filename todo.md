@@ -232,3 +232,8 @@
 - [x] Auto-open the creation dialog in JobCardGenerator when invoiceId query param is present
 - [x] Pre-fill the job card form with data from the pre-selected invoice
 - [x] Save checkpoint
+
+## PO Number in Invoice PDF
+- [x] Add PO number to invoice PDF details block (right column, below Due Date)
+- [x] Add PO number to payment reference line in the payment info box
+- [x] Save checkpoint

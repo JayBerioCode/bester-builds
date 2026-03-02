@@ -38,6 +38,7 @@ export interface InvoiceData {
   company?: CompanyProfile;
   invoice: {
     invoiceNumber: string;
+    poNumber?: string | null;
     status: string;
     issueDate: Date | string;
     dueDate: Date | string;
@@ -221,6 +222,9 @@ export function generateInvoicePDF(data: InvoiceData, res: Response): void {
 
   detail("Issue Date:", fmtDate(data.invoice.issueDate));
   detail("Due Date:", fmtDate(data.invoice.dueDate));
+  if (data.invoice.poNumber) {
+    detail("PO Number:", data.invoice.poNumber);
+  }
   if (data.order) {
     detail("Order Ref:", data.order.orderNumber);
     detail("Job:", data.order.title);
@@ -335,7 +339,7 @@ export function generateInvoicePDF(data: InvoiceData, res: Response): void {
   doc.fillColor(BRAND.primary).fontSize(9).font("Helvetica-Bold").text("PAYMENT INFORMATION", L + 12, y + 10);
   doc.fillColor(BRAND.text).fontSize(8).font("Helvetica");
   const bankLine = `Bank: ${bankName}  |  Account Name: ${accountName}  |  Account No: ${accountNumber}  |  Branch Code: ${branchCode}${vatNumber ? `  |  VAT: ${vatNumber}` : ""}`;
-  const refLine = `Reference: ${data.invoice.invoiceNumber}  |  Email: ${contactEmail}  |  Tel: ${contactPhone}`;
+  const refLine = `Reference: ${data.invoice.invoiceNumber}${data.invoice.poNumber ? `  |  PO: ${data.invoice.poNumber}` : ""}  |  Email: ${contactEmail}  |  Tel: ${contactPhone}`;
   doc.text(bankLine, L + 12, y + 24, { width: W - 24 });
   doc.text(refLine, L + 12, y + 38, { width: W - 24 });
 
