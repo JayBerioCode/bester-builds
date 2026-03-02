@@ -84,6 +84,7 @@ const menuGroups = [
     label: "Settings",
     items: [
       { icon: Tag, label: "Pricing Rates", path: "/settings/pricing" },
+      { icon: FileText, label: "Payroll Report", path: "/settings/payroll" },
     ],
   },
 ];

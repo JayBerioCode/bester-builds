@@ -102,6 +102,10 @@ vi.mock("./db", () => ({
     { shiftId: 1, employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", department: "Production", hourlyRate: "75.00", clockIn: new Date("2026-03-01T08:00:00Z"), clockOut: new Date("2026-03-01T16:00:00Z"), hoursWorked: "8.00", earnings: "600.00", notes: null },
   ]),
   logJobMaterialUsage: vi.fn().mockResolvedValue({ id: 1, orderId: 1, inventoryItemId: 1, quantityUsed: "2.500", unitCost: "45.00", totalCost: "112.50", notes: "3m² PVC banner", createdAt: new Date() }),
+  getPayrollReport: vi.fn().mockResolvedValue([
+    { employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", department: "Production", hourlyRate: "75.00", totalShifts: 10, totalHours: 80, totalEarnings: 6000, avgHoursPerShift: 8 },
+    { employeeId: 2, employeeName: "Jane Smith", employeeRole: "designer", department: "Design", hourlyRate: "90.00", totalShifts: 8, totalHours: 64, totalEarnings: 5760, avgHoursPerShift: 8 },
+  ]),
   getJobCostingReport: vi.fn().mockResolvedValue([
     { orderId: 1, orderNumber: "BB-001", title: "Banner Print", status: "in_production", customerId: 1, customerName: "Test Client", quotedTotal: 1150, actualCost: 450, grossMargin: 700, marginPct: 60.87, hasMaterialsLogged: true },
     { orderId: 2, orderNumber: "BB-002", title: "Vinyl Wrap", status: "quote", customerId: 1, customerName: "Test Client", quotedTotal: 800, actualCost: 0, grossMargin: 0, marginPct: null, hasMaterialsLogged: false },
@@ -838,5 +842,42 @@ describe("jobCosting.report", () => {
     const uncosted = result.find((j) => !j.hasMaterialsLogged);
     expect(uncosted).toBeDefined();
     expect(uncosted?.marginPct).toBeNull();
+  });
+});
+
+// ─── Payroll Report Tests ─────────────────────────────────────────────────────
+describe("payroll.report", () => {
+  it("returns payroll summary for a date range", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.payroll.report({
+      startDate: new Date("2026-03-01T00:00:00Z"),
+      endDate: new Date("2026-03-31T23:59:59Z"),
+    });
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+    const emp = result[0];
+    expect(emp).toHaveProperty("employeeName");
+    expect(emp).toHaveProperty("totalShifts");
+    expect(emp).toHaveProperty("totalHours");
+    expect(emp).toHaveProperty("totalEarnings");
+    expect(emp).toHaveProperty("avgHoursPerShift");
+  });
+
+  it("rejects payroll report for unauthenticated users", async () => {
+    const ctx = { ...makeCtx(), user: null };
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.payroll.report({
+        startDate: new Date("2026-03-01T00:00:00Z"),
+        endDate: new Date("2026-03-31T23:59:59Z"),
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("throws BAD_REQUEST when dates are missing", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(
+      caller.payroll.report({} as { startDate: Date; endDate: Date })
+    ).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

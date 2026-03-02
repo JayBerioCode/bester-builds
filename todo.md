@@ -139,3 +139,16 @@
 - [x] Add profitability trend chart (quoted vs cost vs margin over time)
 - [x] Write vitest tests for jobCosting procedure
 - [x] Save checkpoint
+
+## Payroll Report Page
+- [x] Add getPayrollReport DB helper (date range → per-employee hours, earnings, shift count, avg hours/day)
+- [x] Add payroll.report tRPC procedure
+- [x] Register GET /api/payroll/pdf Express route for PDF generation
+- [x] Create server/payrollPdf.ts with PDFKit payroll report generator
+- [x] Build PayrollReport page under /settings/payroll with pay period selector
+- [x] Show per-employee summary table (name, role, shifts, total hours, hourly rate, gross earnings)
+- [x] Show company-wide totals row
+- [x] Add "Download PDF" button for accountant-ready payroll report
+- [x] Add PayrollReport route and sidebar nav entry under Settings
+- [x] Write vitest tests for payroll.report procedure
+- [x] Save checkpoint

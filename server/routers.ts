@@ -75,6 +75,7 @@ import {
   getJobUsageByOrder,
   deleteJobUsageEntry,
   getJobCostingReport,
+  getPayrollReport,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -729,6 +730,21 @@ const pricingRouter = router({
     }),
 });
 
+// ─── Payroll Router ─────────────────────────────────────────────────────────
+const payrollRouter = router({
+  report: protectedProcedure
+    .input(
+      (input: unknown) => {
+        const i = input as { startDate: Date; endDate: Date };
+        if (!i?.startDate || !i?.endDate) throw new TRPCError({ code: "BAD_REQUEST", message: "startDate and endDate are required" });
+        return i;
+      }
+    )
+    .query(async ({ input }) => {
+      return getPayrollReport(new Date(input.startDate), new Date(input.endDate));
+    }),
+});
+
 // ─── App Router ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -752,6 +768,7 @@ export const appRouter = router({
   shifts: shiftsRouter,
   pricing: pricingRouter,
   jobCosting: jobCostingRouter,
+  payroll: payrollRouter,
 });
 
 export type AppRouter = typeof appRouter;

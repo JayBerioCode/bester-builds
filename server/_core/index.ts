@@ -7,8 +7,9 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
-import { getInvoiceForPDF } from "../db";
+import { getInvoiceForPDF, getPayrollReport } from "../db";
 import { generateInvoicePDF } from "../pdf";
+import { generatePayrollPDF } from "../payrollPdf";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -69,6 +70,28 @@ async function startServer() {
     } catch (err) {
       console.error("[PDF] Error generating invoice:", err);
       res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
+
+  // Payroll PDF download route
+  app.get("/api/payroll/pdf", async (req, res) => {
+    try {
+      const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+      if (!startDate || !endDate) {
+        res.status(400).json({ error: "startDate and endDate query params are required" });
+        return;
+      }
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        res.status(400).json({ error: "Invalid date format" });
+        return;
+      }
+      const employees = await getPayrollReport(start, end);
+      generatePayrollPDF(res, employees, start, end);
+    } catch (err) {
+      console.error("[Payroll PDF] Error:", err);
+      res.status(500).json({ error: "Failed to generate payroll PDF" });
     }
   });
 

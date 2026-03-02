@@ -1171,3 +1171,85 @@ export async function getJobCostingReport(from?: Date, to?: Date) {
     };
   });
 }
+
+// ─── Payroll Report ───────────────────────────────────────────────────────────
+export async function getPayrollReport(startDate: Date, endDate: Date) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Fetch all completed shifts within the date range
+  const shifts = await db
+    .select({
+      shiftId: shiftLogs.id,
+      employeeId: shiftLogs.employeeId,
+      employeeName: employees.name,
+      employeeRole: employees.role,
+      department: employees.department,
+      hourlyRate: employees.hourlyRate,
+      clockIn: shiftLogs.clockIn,
+      clockOut: shiftLogs.clockOut,
+      hoursWorked: shiftLogs.hoursWorked,
+      earnings: shiftLogs.earnings,
+    })
+    .from(shiftLogs)
+    .innerJoin(employees, eq(shiftLogs.employeeId, employees.id))
+    .where(
+      and(
+        gte(shiftLogs.clockIn, startDate),
+        lte(shiftLogs.clockIn, endDate),
+        sql`${shiftLogs.clockOut} IS NOT NULL`
+      )
+    )
+    .orderBy(employees.name, shiftLogs.clockIn);
+
+  // Group by employee
+  const employeeMap = new Map<
+    number,
+    {
+      employeeId: number;
+      employeeName: string;
+      employeeRole: string;
+      department: string | null;
+      hourlyRate: string;
+      totalShifts: number;
+      totalHours: number;
+      totalEarnings: number;
+      shifts: typeof shifts;
+    }
+  >();
+
+  for (const shift of shifts) {
+    const hours = parseFloat(shift.hoursWorked ?? "0");
+    const earn = parseFloat(shift.earnings ?? "0");
+
+    if (!employeeMap.has(shift.employeeId)) {
+      employeeMap.set(shift.employeeId, {
+        employeeId: shift.employeeId,
+        employeeName: shift.employeeName ?? "Unknown",
+        employeeRole: shift.employeeRole ?? "staff",
+        department: shift.department,
+        hourlyRate: shift.hourlyRate ?? "0",
+        totalShifts: 0,
+        totalHours: 0,
+        totalEarnings: 0,
+        shifts: [],
+      });
+    }
+
+    const emp = employeeMap.get(shift.employeeId)!;
+    emp.totalShifts += 1;
+    emp.totalHours += hours;
+    emp.totalEarnings += earn;
+    emp.shifts.push(shift);
+  }
+
+  return Array.from(employeeMap.values()).map((emp) => ({
+    ...emp,
+    totalHours: parseFloat(emp.totalHours.toFixed(2)),
+    totalEarnings: parseFloat(emp.totalEarnings.toFixed(2)),
+    avgHoursPerShift:
+      emp.totalShifts > 0
+        ? parseFloat((emp.totalHours / emp.totalShifts).toFixed(2))
+        : 0,
+  }));
+}
