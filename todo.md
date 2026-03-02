@@ -105,3 +105,15 @@
 - [x] Navigate to Invoices page after successful conversion
 - [x] Write vitest tests for convertToInvoice procedure
 - [x] Save checkpoint
+
+## Print Cost Calculator
+- [x] Create pricing_rates table in DB schema (printType, material, baseRatePerSqm, setupFee, minCharge)
+- [x] Generate and apply migration SQL
+- [x] Seed default pricing rates for all print types and common materials
+- [x] Add calculatePrintCost DB helper (dimensions, material, quantity, finishing → line items + subtotal)
+- [x] Add orders.calculateCost tRPC procedure
+- [x] Add orders.getPricingRates tRPC procedure (for the form dropdowns)
+- [x] Integrate live cost calculator panel into the Orders form (dimension inputs → real-time price breakdown)
+- [x] Auto-populate subtotal, line items, and total fields from calculator output
+- [x] Write vitest tests for calculateCost procedure
+- [x] Save checkpoint

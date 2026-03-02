@@ -64,6 +64,8 @@ import {
   getTimesheetExport,
   createInvoiceFromOrder,
   getOrderWithItemsForInvoice,
+  getPricingRates,
+  calculatePrintCost,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -333,6 +335,24 @@ const ordersRouter = router({
         input.terms
       );
     }),
+
+  // Pricing calculator
+  getPricingRates: protectedProcedure
+    .input(z.object({ printType: z.string().optional() }).optional())
+    .query(({ input }) => getPricingRates(input?.printType)),
+
+  calculateCost: protectedProcedure
+    .input(z.object({
+      printType: z.string(),
+      material: z.string(),
+      widthM: z.number().positive(),
+      heightM: z.number().positive(),
+      quantity: z.number().int().positive().default(1),
+      addLamination: z.boolean().default(false),
+      addEyelets: z.boolean().default(false),
+      perimeter: z.number().optional(),
+    }))
+    .mutation(({ input }) => calculatePrintCost(input)),
 });
 
 // ─── Invoices Router ─────────────────────────────────────────────────────────

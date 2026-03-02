@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,8 +8,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, ClipboardList, Search, Trash2, ChevronRight, FileText } from "lucide-react";
+import { Plus, ClipboardList, Search, Trash2, ChevronRight, FileText, Calculator, CheckCircle2, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 
 const statusColors: Record<string, string> = {
@@ -32,6 +33,17 @@ const priorityColors: Record<string, string> = {
 
 const statusFlow = ["quote", "confirmed", "in_production", "quality_check", "ready", "dispatched", "delivered"];
 
+// Unit conversion helpers → always work in metres
+const toMetres = (value: number, unit: string): number => {
+  switch (unit) {
+    case "mm": return value / 1000;
+    case "cm": return value / 100;
+    case "inch": return value * 0.0254;
+    case "ft": return value * 0.3048;
+    default: return value; // already metres
+  }
+};
+
 function OrderForm({ onSuccess, customers }: { onSuccess: () => void; customers: any[] }) {
   const utils = trpc.useUtils();
   const create = trpc.orders.create.useMutation({
@@ -45,7 +57,7 @@ function OrderForm({ onSuccess, customers }: { onSuccess: () => void; customers:
     description: "",
     status: "quote",
     priority: "normal",
-    printType: "other",
+    printType: "banner",
     width: "",
     height: "",
     dimensionUnit: "m",
@@ -61,11 +73,63 @@ function OrderForm({ onSuccess, customers }: { onSuccess: () => void; customers:
     notes: "",
   });
 
-  const calcTotal = (sub: string, tax: string, disc = "0") => {
+  // Calculator state
+  const [calcResult, setCalcResult] = useState<null | {
+    sqm: number;
+    unitCost: number;
+    subtotal: number;
+    lineItems: { description: string; quantity: string; unitPrice: string; total: string }[];
+    rateUsed: { material: string; ratePerSqm: number; setupFee: number; minCharge: number };
+  }>(null);
+  const [addLamination, setAddLamination] = useState(false);
+  const [addEyelets, setAddEyelets] = useState(false);
+  const [calcApplied, setCalcApplied] = useState(false);
+
+  // Fetch pricing rates for the selected print type
+  const { data: allRates = [] } = trpc.orders.getPricingRates.useQuery(
+    { printType: form.printType },
+    { enabled: !!form.printType }
+  );
+  const availableMaterials = useMemo(() => {
+    const seen = new Set<string>();
+    return allRates.filter((r) => { if (seen.has(r.material)) return false; seen.add(r.material); return true; });
+  }, [allRates]);
+
+  const calculateCost = trpc.orders.calculateCost.useMutation({
+    onSuccess: (result) => {
+      setCalcResult(result);
+      setCalcApplied(false);
+    },
+    onError: (e) => toast.error(`Calculator: ${e.message}`),
+  });
+
+  const handleCalculate = () => {
+    const w = parseFloat(form.width);
+    const h = parseFloat(form.height);
+    if (!w || !h) { toast.error("Enter width and height to calculate"); return; }
+    if (!form.material) { toast.error("Select a material to calculate"); return; }
+    calculateCost.mutate({
+      printType: form.printType,
+      material: form.material,
+      widthM: toMetres(w, form.dimensionUnit),
+      heightM: toMetres(h, form.dimensionUnit),
+      quantity: parseInt(form.quantity) || 1,
+      addLamination,
+      addEyelets,
+    });
+  };
+
+  const applyCalculation = () => {
+    if (!calcResult) return;
+    setForm((f) => ({ ...f, subtotal: calcResult.subtotal.toFixed(2) }));
+    setCalcApplied(true);
+    toast.success("Calculated price applied to order");
+  };
+
+  const calcTotal = (sub: string, tax: string) => {
     const s = parseFloat(sub) || 0;
     const t = (s * (parseFloat(tax) || 0)) / 100;
-    const d = parseFloat(disc) || 0;
-    return (s + t - d).toFixed(2);
+    return (s + t).toFixed(2);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -93,11 +157,13 @@ function OrderForm({ onSuccess, customers }: { onSuccess: () => void; customers:
       deliveryMethod: form.deliveryMethod as any,
       deliveryAddress: form.deliveryAddress,
       notes: form.notes,
+      items: calcResult && calcApplied ? calcResult.lineItems as any : undefined,
     });
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* ── Customer & Title ── */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-1.5 col-span-2">
           <Label>Customer *</Label>
@@ -110,18 +176,7 @@ function OrderForm({ onSuccess, customers }: { onSuccess: () => void; customers:
         </div>
         <div className="space-y-1.5 col-span-2">
           <Label>Job Title *</Label>
-          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required placeholder="e.g. 3m x 1m Vinyl Banner — ABC Corp" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Print Type</Label>
-          <Select value={form.printType} onValueChange={(v) => setForm({ ...form, printType: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {["banner","poster","signage","vehicle_wrap","canvas","fabric","wallpaper","floor_graphic","window_graphic","other"].map((t) => (
-                <SelectItem key={t} value={t}>{t.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required placeholder="e.g. 3m × 1m Vinyl Banner — ABC Corp" />
         </div>
         <div className="space-y-1.5">
           <Label>Priority</Label>
@@ -136,52 +191,7 @@ function OrderForm({ onSuccess, customers }: { onSuccess: () => void; customers:
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label>Width</Label>
-          <Input type="number" value={form.width} onChange={(e) => setForm({ ...form, width: e.target.value })} placeholder="3.0" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Height</Label>
-          <Input type="number" value={form.height} onChange={(e) => setForm({ ...form, height: e.target.value })} placeholder="1.0" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Unit</Label>
-          <Select value={form.dimensionUnit} onValueChange={(v) => setForm({ ...form, dimensionUnit: v })}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="mm">mm</SelectItem>
-              <SelectItem value="cm">cm</SelectItem>
-              <SelectItem value="m">m</SelectItem>
-              <SelectItem value="inch">inch</SelectItem>
-              <SelectItem value="ft">ft</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label>Quantity</Label>
-          <Input type="number" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} min="1" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Material</Label>
-          <Input value={form.material} onChange={(e) => setForm({ ...form, material: e.target.value })} placeholder="e.g. Gloss Vinyl 440gsm" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Finishing</Label>
-          <Input value={form.finishing} onChange={(e) => setForm({ ...form, finishing: e.target.value })} placeholder="e.g. Laminated, Eyelets" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Subtotal (ZAR)</Label>
-          <Input type="number" value={form.subtotal} onChange={(e) => setForm({ ...form, subtotal: e.target.value })} placeholder="0.00" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Tax Rate (%)</Label>
-          <Input type="number" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Due Date</Label>
-          <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Delivery Method</Label>
+          <Label>Delivery</Label>
           <Select value={form.deliveryMethod} onValueChange={(v) => setForm({ ...form, deliveryMethod: v })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -191,19 +201,200 @@ function OrderForm({ onSuccess, customers }: { onSuccess: () => void; customers:
             </SelectContent>
           </Select>
         </div>
+      </div>
+
+      <Separator />
+
+      {/* ── Print Cost Calculator ── */}
+      <div className="rounded-xl border border-violet-200 bg-violet-50/50 p-4 space-y-4">
+        <div className="flex items-center gap-2">
+          <Calculator className="h-4 w-4 text-violet-600" />
+          <span className="font-semibold text-violet-800 text-sm">Print Cost Calculator</span>
+          <span className="text-xs text-violet-500 ml-auto">Auto-calculates price from dimensions</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Print Type */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Print Type</Label>
+            <Select value={form.printType} onValueChange={(v) => { setForm({ ...form, printType: v, material: "" }); setCalcResult(null); setCalcApplied(false); }}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {["banner","poster","signage","vehicle_wrap","canvas","fabric","wallpaper","floor_graphic","window_graphic","other"].map((t) => (
+                  <SelectItem key={t} value={t}>{t.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Material — driven by pricing rates */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Material / Substrate</Label>
+            <Select value={form.material} onValueChange={(v) => { setForm({ ...form, material: v }); setCalcResult(null); setCalcApplied(false); }}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select material..." /></SelectTrigger>
+              <SelectContent>
+                {availableMaterials.map((r) => (
+                  <SelectItem key={r.id} value={r.material}>
+                    {r.material} — R{parseFloat(r.ratePerSqm).toFixed(0)}/m²
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Width */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Width</Label>
+            <Input className="h-8 text-xs" type="number" step="0.01" min="0.01" value={form.width}
+              onChange={(e) => { setForm({ ...form, width: e.target.value }); setCalcResult(null); setCalcApplied(false); }}
+              placeholder="3.0" />
+          </div>
+
+          {/* Height */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Height</Label>
+            <Input className="h-8 text-xs" type="number" step="0.01" min="0.01" value={form.height}
+              onChange={(e) => { setForm({ ...form, height: e.target.value }); setCalcResult(null); setCalcApplied(false); }}
+              placeholder="1.0" />
+          </div>
+
+          {/* Unit */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Unit</Label>
+            <Select value={form.dimensionUnit} onValueChange={(v) => { setForm({ ...form, dimensionUnit: v }); setCalcResult(null); setCalcApplied(false); }}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="mm">mm</SelectItem>
+                <SelectItem value="cm">cm</SelectItem>
+                <SelectItem value="m">m</SelectItem>
+                <SelectItem value="inch">inch</SelectItem>
+                <SelectItem value="ft">ft</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Quantity */}
+          <div className="space-y-1.5">
+            <Label className="text-xs">Quantity</Label>
+            <Input className="h-8 text-xs" type="number" min="1" value={form.quantity}
+              onChange={(e) => { setForm({ ...form, quantity: e.target.value }); setCalcResult(null); setCalcApplied(false); }} />
+          </div>
+        </div>
+
+        {/* Finishing options */}
+        <div className="flex gap-4">
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <input type="checkbox" checked={addLamination} onChange={(e) => { setAddLamination(e.target.checked); setCalcResult(null); setCalcApplied(false); }} className="rounded" />
+            <span>Add Lamination</span>
+          </label>
+          <label className="flex items-center gap-2 text-xs cursor-pointer">
+            <input type="checkbox" checked={addEyelets} onChange={(e) => { setAddEyelets(e.target.checked); setCalcResult(null); setCalcApplied(false); }} className="rounded" />
+            <span>Add Eyelets / Hem</span>
+          </label>
+        </div>
+
+        {/* Calculate button */}
+        <Button type="button" size="sm" variant="outline"
+          className="w-full border-violet-300 text-violet-700 hover:bg-violet-100 text-xs"
+          disabled={calculateCost.isPending}
+          onClick={handleCalculate}
+        >
+          <Calculator className="h-3.5 w-3.5 mr-1.5" />
+          {calculateCost.isPending ? "Calculating..." : "Calculate Price"}
+        </Button>
+
+        {/* Result panel */}
+        {calcResult && (
+          <div className="rounded-lg bg-white border border-violet-200 p-3 space-y-2">
+            <div className="text-xs font-semibold text-violet-700 mb-1">Price Breakdown</div>
+            <div className="space-y-1">
+              {calcResult.lineItems.map((item, i) => (
+                <div key={i} className="flex justify-between text-xs">
+                  <span className="text-muted-foreground flex-1 pr-2">{item.description}</span>
+                  <span className="font-medium shrink-0">R {parseFloat(item.total).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+                </div>
+              ))}
+            </div>
+            <div className="border-t pt-2 flex justify-between text-sm font-bold text-violet-800">
+              <span>Subtotal (excl. VAT)</span>
+              <span>R {calcResult.subtotal.toLocaleString("en-ZA", { minimumFractionDigits: 2 })}</span>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              {calcResult.sqm.toFixed(2)} m² · Rate: R{calcResult.rateUsed.ratePerSqm}/m² · Min charge: R{calcResult.rateUsed.minCharge}
+            </div>
+            {calcApplied ? (
+              <div className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5" /> Applied to order
+              </div>
+            ) : (
+              <Button type="button" size="sm" className="w-full bg-violet-600 hover:bg-violet-700 text-white text-xs" onClick={applyCalculation}>
+                Apply to Order
+              </Button>
+            )}
+          </div>
+        )}
+
+        {/* Finishing notes */}
+        <div className="space-y-1.5">
+          <Label className="text-xs">Finishing Notes</Label>
+          <Input className="h-8 text-xs" value={form.finishing} onChange={(e) => setForm({ ...form, finishing: e.target.value })} placeholder="e.g. Gloss laminate, eyelets every 500mm" />
+        </div>
+      </div>
+
+      {/* ── Pricing (manual override) ── */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label className="flex items-center gap-1.5">
+            Subtotal (ZAR)
+            {calcApplied && <Badge className="text-[9px] px-1.5 py-0 bg-violet-100 text-violet-700">Calculated</Badge>}
+          </Label>
+          <Input type="number" value={form.subtotal} onChange={(e) => { setForm({ ...form, subtotal: e.target.value }); setCalcApplied(false); }} placeholder="0.00" />
+        </div>
+        <div className="space-y-1.5">
+          <Label>VAT Rate (%)</Label>
+          <Input type="number" value={form.taxRate} onChange={(e) => setForm({ ...form, taxRate: e.target.value })} />
+        </div>
         {form.subtotal && (
           <div className="col-span-2 p-3 bg-muted/50 rounded-lg text-sm">
-            <div className="flex justify-between"><span>Subtotal</span><span>R {parseFloat(form.subtotal).toFixed(2)}</span></div>
-            <div className="flex justify-between text-muted-foreground"><span>VAT ({form.taxRate}%)</span><span>R {((parseFloat(form.subtotal) || 0) * (parseFloat(form.taxRate) || 0) / 100).toFixed(2)}</span></div>
-            <div className="flex justify-between font-bold border-t mt-1 pt-1"><span>Total</span><span>R {calcTotal(form.subtotal, form.taxRate)}</span></div>
+            <div className="flex justify-between"><span>Subtotal</span><span>R {parseFloat(form.subtotal || "0").toFixed(2)}</span></div>
+            <div className="flex justify-between text-muted-foreground">
+              <span>VAT ({form.taxRate}%)</span>
+              <span>R {((parseFloat(form.subtotal) || 0) * (parseFloat(form.taxRate) || 0) / 100).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-bold border-t mt-1 pt-1">
+              <span>Total</span>
+              <span>R {calcTotal(form.subtotal, form.taxRate)}</span>
+            </div>
+          </div>
+        )}
+        {!calcApplied && form.width && form.height && form.material && (
+          <div className="col-span-2 flex items-center gap-1.5 text-xs text-amber-600">
+            <AlertCircle className="h-3.5 w-3.5" />
+            Click "Calculate Price" above to get an accurate quote from your pricing rates.
           </div>
         )}
       </div>
+
+      {/* ── Scheduling ── */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-1.5">
+          <Label>Due Date</Label>
+          <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Delivery Address</Label>
+          <Input value={form.deliveryAddress} onChange={(e) => setForm({ ...form, deliveryAddress: e.target.value })} placeholder="Leave blank for pickup" />
+        </div>
+      </div>
+
       <div className="space-y-1.5">
         <Label>Notes</Label>
-        <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+        <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} placeholder="Client instructions, artwork notes, etc." />
       </div>
-      <Button type="submit" className="w-full" disabled={create.isPending}>Create Order</Button>
+
+      <Button type="submit" className="w-full" disabled={create.isPending}>
+        {create.isPending ? "Creating..." : "Create Order / Quote"}
+      </Button>
     </form>
   );
 }
@@ -282,7 +473,6 @@ export default function Orders() {
               variant={statusFilter === s ? "default" : "outline"}
               size="sm"
               onClick={() => setStatusFilter(s)}
-              className="whitespace-nowrap"
             >
               {s.replace(/_/g, " ").replace(/\b\w/g, (l) => l.toUpperCase())} ({count})
             </Button>
@@ -290,24 +480,15 @@ export default function Orders() {
         })}
       </div>
 
+      {/* Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
+        <Input className="pl-9" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
+      {/* Orders list */}
       {isLoading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <Card key={i} className="border-0 shadow-sm">
-              <CardContent className="p-4">
-                <div className="animate-pulse space-y-2">
-                  <div className="h-4 bg-muted rounded w-1/3" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <div className="space-y-2">{[...Array(3)].map((_, i) => <div key={i} className="h-20 bg-muted animate-pulse rounded-lg" />)}</div>
       ) : filtered.length === 0 ? (
         <Card className="border-0 shadow-sm">
           <CardContent className="p-12 text-center">

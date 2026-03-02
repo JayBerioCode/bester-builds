@@ -306,3 +306,25 @@ export const shiftLogs = mysqlTable("shift_logs", {
 
 export type ShiftLog = typeof shiftLogs.$inferSelect;
 export type InsertShiftLog = typeof shiftLogs.$inferInsert;
+
+// ─── Pricing Rates (Print Cost Calculator) ───────────────────────────────────
+export const pricingRates = mysqlTable("pricing_rates", {
+  id: int("id").autoincrement().primaryKey(),
+  printType: mysqlEnum("printType", ["banner", "poster", "signage", "vehicle_wrap", "canvas", "fabric", "wallpaper", "floor_graphic", "window_graphic", "other"]).notNull(),
+  material: varchar("material", { length: 100 }).notNull(),
+  /** Base rate per square metre in ZAR */
+  ratePerSqm: decimal("ratePerSqm", { precision: 10, scale: 2 }).notNull(),
+  /** One-time setup / artwork fee in ZAR */
+  setupFee: decimal("setupFee", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  /** Minimum charge per job in ZAR */
+  minCharge: decimal("minCharge", { precision: 10, scale: 2 }).default("0.00").notNull(),
+  /** Optional finishing surcharge per sqm (e.g. lamination) */
+  laminationRatePerSqm: decimal("laminationRatePerSqm", { precision: 10, scale: 2 }).default("0.00"),
+  /** Optional eyelet/hem surcharge per linear metre */
+  eyeletRatePerMetre: decimal("eyeletRatePerMetre", { precision: 10, scale: 2 }).default("0.00"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+export type PricingRate = typeof pricingRates.$inferSelect;
+export type InsertPricingRate = typeof pricingRates.$inferInsert;

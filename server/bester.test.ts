@@ -69,6 +69,29 @@ vi.mock("./db", () => ({
   hashPin: vi.fn().mockResolvedValue("$2b$10$hashedpin"),
   createInvoiceFromOrder: vi.fn().mockResolvedValue({ id: 99, invoiceNumber: "INV-999999", orderId: 1, customerId: 1, status: "draft", subtotal: "1000.00", taxRate: "15", taxAmount: "150.00", discountAmount: "0.00", total: "1150.00", amountPaid: "0.00", amountDue: "1150.00", issueDate: new Date(), dueDate: new Date(Date.now() + 30*24*60*60*1000), notes: null, terms: null, createdAt: new Date(), updatedAt: new Date() }),
   getOrderWithItemsForInvoice: vi.fn().mockResolvedValue({ order: { id: 1, orderNumber: "BB-001", title: "Test Banner", customerId: 1, status: "quote", subtotal: "1000.00", taxRate: "0", taxAmount: "0", discountAmount: "0", total: "1000.00" }, customer: { id: 1, name: "Test Client" }, items: [] }),
+  getPricingRates: vi.fn().mockResolvedValue([
+    { id: 1, printType: "banner", material: "PVC 440gsm", ratePerSqm: "85.00", setupFee: "150.00", minCharge: "250.00", laminationRatePerSqm: "35.00", eyeletRatePerMetre: "12.00", isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  ]),
+  calculatePrintCost: vi.fn().mockImplementation(async (input: any) => {
+    const sqm = input.widthM * input.heightM;
+    const ratePerSqm = 85;
+    const setupFee = 150;
+    const minCharge = 250;
+    const laminationRate = 35;
+    const eyeletRate = 12;
+    const printCostPerUnit = sqm * ratePerSqm;
+    const laminationCostPerUnit = input.addLamination ? sqm * laminationRate : 0;
+    const perimeter = 2 * (input.widthM + input.heightM);
+    const eyeletCostPerUnit = input.addEyelets ? perimeter * eyeletRate : 0;
+    const unitCost = printCostPerUnit + laminationCostPerUnit + eyeletCostPerUnit;
+    const rawTotal = unitCost * input.quantity + setupFee;
+    const subtotal = Math.max(rawTotal, minCharge);
+    const lineItems: any[] = [{ description: `banner print — PVC 440gsm (${sqm.toFixed(2)}m²)`, quantity: String(input.quantity), unitPrice: printCostPerUnit.toFixed(2), total: (printCostPerUnit * input.quantity).toFixed(2) }];
+    if (input.addLamination && laminationCostPerUnit > 0) lineItems.push({ description: `Lamination`, quantity: String(input.quantity), unitPrice: laminationCostPerUnit.toFixed(2), total: (laminationCostPerUnit * input.quantity).toFixed(2) });
+    if (input.addEyelets && eyeletCostPerUnit > 0) lineItems.push({ description: `Eyelets/Hem`, quantity: String(input.quantity), unitPrice: eyeletCostPerUnit.toFixed(2), total: (eyeletCostPerUnit * input.quantity).toFixed(2) });
+    lineItems.push({ description: "Setup / Artwork fee", quantity: "1", unitPrice: setupFee.toFixed(2), total: setupFee.toFixed(2) });
+    return { sqm: parseFloat(sqm.toFixed(2)), unitCost: parseFloat(unitCost.toFixed(2)), subtotal: parseFloat(subtotal.toFixed(2)), lineItems, rateUsed: { material: "PVC 440gsm", ratePerSqm, setupFee, minCharge } };
+  }),
   getTimesheetExport: vi.fn().mockResolvedValue([
     { shiftId: 1, employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", department: "Production", hourlyRate: "75.00", clockIn: new Date("2026-03-01T08:00:00Z"), clockOut: new Date("2026-03-01T16:00:00Z"), hoursWorked: "8.00", earnings: "600.00", notes: null },
   ]),
@@ -604,5 +627,92 @@ describe("orders.convertToInvoice", () => {
     });
 
     expect(result).toBeDefined();
+  });
+});
+
+// ─── Print Cost Calculator Tests ─────────────────────────────────────────────
+describe("orders.calculateCost", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("calculates cost for a banner print job", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.orders.calculateCost({
+      printType: "banner",
+      material: "PVC 440gsm",
+      widthM: 3,
+      heightM: 1,
+      quantity: 1,
+      addLamination: false,
+      addEyelets: false,
+    });
+    expect(result).toBeDefined();
+    expect(result.sqm).toBe(3);
+    expect(result.subtotal).toBeGreaterThan(0);
+    expect(result.lineItems.length).toBeGreaterThan(0);
+  });
+
+  it("adds lamination line item when addLamination is true", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.orders.calculateCost({
+      printType: "banner",
+      material: "PVC 440gsm",
+      widthM: 2,
+      heightM: 1,
+      quantity: 1,
+      addLamination: true,
+      addEyelets: false,
+    });
+    const hasLamination = result.lineItems.some((i) => i.description.toLowerCase().includes("lamination"));
+    expect(hasLamination).toBe(true);
+  });
+
+  it("adds eyelets line item when addEyelets is true", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.orders.calculateCost({
+      printType: "banner",
+      material: "PVC 440gsm",
+      widthM: 2,
+      heightM: 1,
+      quantity: 1,
+      addLamination: false,
+      addEyelets: true,
+    });
+    const hasEyelets = result.lineItems.some((i) => i.description.toLowerCase().includes("eyelet"));
+    expect(hasEyelets).toBe(true);
+  });
+
+  it("multiplies cost by quantity", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    const single = await caller.orders.calculateCost({
+      printType: "banner",
+      material: "PVC 440gsm",
+      widthM: 1,
+      heightM: 1,
+      quantity: 1,
+      addLamination: false,
+      addEyelets: false,
+    });
+    const multi = await caller.orders.calculateCost({
+      printType: "banner",
+      material: "PVC 440gsm",
+      widthM: 1,
+      heightM: 1,
+      quantity: 5,
+      addLamination: false,
+      addEyelets: false,
+    });
+    // Multi should be higher than single (setup fee is shared, print cost scales)
+    expect(multi.subtotal).toBeGreaterThan(single.subtotal);
+  });
+
+  it("returns pricing rates for a given print type", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    const rates = await caller.orders.getPricingRates({ printType: "banner" });
+    expect(Array.isArray(rates)).toBe(true);
   });
 });

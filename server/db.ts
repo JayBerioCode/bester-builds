@@ -17,6 +17,7 @@ import {
   shiftLogs,
   tasks,
   users,
+  pricingRates,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -902,4 +903,110 @@ export async function createInvoiceFromOrder(
     .limit(1);
 
   return newInvoice[0] ?? null;
+}
+
+// ─── Pricing Rates & Cost Calculator ─────────────────────────────────────────
+export async function getPricingRates(printType?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db.select().from(pricingRates).where(eq(pricingRates.isActive, true));
+  if (printType) return rows.filter((r) => r.printType === printType);
+  return rows;
+}
+
+export async function calculatePrintCost(input: {
+  printType: string;
+  material: string;
+  widthM: number;
+  heightM: number;
+  quantity: number;
+  addLamination: boolean;
+  addEyelets: boolean;
+  perimeter?: number; // linear metres for eyelets/hem
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const { printType, material, widthM, heightM, quantity, addLamination, addEyelets, perimeter } = input;
+
+  // Find the matching rate
+  const rates = await db
+    .select()
+    .from(pricingRates)
+    .where(eq(pricingRates.isActive, true));
+
+  const rate = rates.find(
+    (r) => r.printType === printType && r.material.toLowerCase() === material.toLowerCase()
+  );
+
+  if (!rate) throw new Error(`No pricing rate found for ${printType} / ${material}`);
+
+  const sqm = widthM * heightM;
+  const ratePerSqm = parseFloat(rate.ratePerSqm);
+  const setupFee = parseFloat(rate.setupFee);
+  const minCharge = parseFloat(rate.minCharge);
+  const laminationRate = parseFloat(rate.laminationRatePerSqm ?? "0");
+  const eyeletRate = parseFloat(rate.eyeletRatePerMetre ?? "0");
+
+  // Print cost per unit
+  const printCostPerUnit = sqm * ratePerSqm;
+  const laminationCostPerUnit = addLamination ? sqm * laminationRate : 0;
+  const perimetre = perimeter ?? 2 * (widthM + heightM);
+  const eyeletCostPerUnit = addEyelets ? perimetre * eyeletRate : 0;
+  const unitCost = printCostPerUnit + laminationCostPerUnit + eyeletCostPerUnit;
+
+  // Total before setup
+  const totalPrint = unitCost * quantity;
+  const rawTotal = totalPrint + setupFee;
+  const subtotal = Math.max(rawTotal, minCharge);
+
+  // Build line items
+  const lineItems: { description: string; quantity: string; unitPrice: string; total: string }[] = [];
+
+  lineItems.push({
+    description: `${printType.replace(/_/g, " ")} print — ${material} (${widthM}m × ${heightM}m = ${sqm.toFixed(2)}m²)`,
+    quantity: String(quantity),
+    unitPrice: printCostPerUnit.toFixed(2),
+    total: (printCostPerUnit * quantity).toFixed(2),
+  });
+
+  if (addLamination && laminationCostPerUnit > 0) {
+    lineItems.push({
+      description: `Lamination (${sqm.toFixed(2)}m² @ R${laminationRate}/m²)`,
+      quantity: String(quantity),
+      unitPrice: laminationCostPerUnit.toFixed(2),
+      total: (laminationCostPerUnit * quantity).toFixed(2),
+    });
+  }
+
+  if (addEyelets && eyeletCostPerUnit > 0) {
+    lineItems.push({
+      description: `Eyelets/Hem (${perimetre.toFixed(1)}m perimeter @ R${eyeletRate}/m)`,
+      quantity: String(quantity),
+      unitPrice: eyeletCostPerUnit.toFixed(2),
+      total: (eyeletCostPerUnit * quantity).toFixed(2),
+    });
+  }
+
+  if (setupFee > 0) {
+    lineItems.push({
+      description: "Setup / Artwork fee",
+      quantity: "1",
+      unitPrice: setupFee.toFixed(2),
+      total: setupFee.toFixed(2),
+    });
+  }
+
+  return {
+    sqm: parseFloat(sqm.toFixed(2)),
+    unitCost: parseFloat(unitCost.toFixed(2)),
+    subtotal: parseFloat(subtotal.toFixed(2)),
+    lineItems,
+    rateUsed: {
+      material: rate.material,
+      ratePerSqm,
+      setupFee,
+      minCharge,
+    },
+  };
 }
