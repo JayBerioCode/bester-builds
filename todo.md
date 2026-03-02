@@ -245,3 +245,10 @@
 - [x] Add list/kanban view toggle to Job Cards page header
 - [x] Persist view preference in localStorage
 - [x] Save checkpoint
+
+## Bug Fix: FORBIDDEN error on Employee Access / Shift Approval pages
+- [x] Diagnose: allowlist.list, localAuth.listUsers, shifts.approve/reject/bulkApprove required LOCAL_AUTH_COOKIE but Manus OAuth admin has no local cookie
+- [x] Fix allowlist.list, allowlist.add, allowlist.remove to also accept ctx.user?.role === 'admin' (Manus OAuth)
+- [x] Fix localAuth.listUsers, setActive, setRole to also accept ctx.user?.role === 'admin'
+- [x] Fix shifts.approve, shifts.reject, shifts.bulkApprove to also accept ctx.user?.role === 'admin'
+- [x] Save checkpoint

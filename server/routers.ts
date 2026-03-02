@@ -704,35 +704,39 @@ const shiftsRouter = router({
   approve: protectedProcedure
     .input(z.object({ shiftId: z.number() }))
     .mutation(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const user = await findLocalUserById(session.localUserId);
-      await approveShift(input.shiftId, session.localUserId, user?.name ?? "Admin");
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
+      const adminId = session?.localUserId ?? 0;
+      const adminName = isOAuthAdmin ? (ctx.user?.name ?? "Admin") : ((await findLocalUserById(adminId))?.name ?? "Admin");
+      await approveShift(input.shiftId, adminId, adminName);
       return { success: true };
     }),
-
   /** Reject a shift with an optional reason (admin only). */
   reject: protectedProcedure
     .input(z.object({ shiftId: z.number(), reason: z.string().optional() }))
     .mutation(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const user = await findLocalUserById(session.localUserId);
-      await rejectShift(input.shiftId, session.localUserId, user?.name ?? "Admin", input.reason);
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
+      const adminId = session?.localUserId ?? 0;
+      const adminName = isOAuthAdmin ? (ctx.user?.name ?? "Admin") : ((await findLocalUserById(adminId))?.name ?? "Admin");
+      await rejectShift(input.shiftId, adminId, adminName, input.reason);
       return { success: true };
     }),
-
   /** Bulk-approve multiple shifts at once (admin only). */
   bulkApprove: protectedProcedure
     .input(z.object({ shiftIds: z.array(z.number()).min(1) }))
     .mutation(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
-      const user = await findLocalUserById(session.localUserId);
-      await bulkApproveShifts(input.shiftIds, session.localUserId, user?.name ?? "Admin");
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
+      const adminId = session?.localUserId ?? 0;
+      const adminName = isOAuthAdmin ? (ctx.user?.name ?? "Admin") : ((await findLocalUserById(adminId))?.name ?? "Admin");
+      await bulkApproveShifts(input.shiftIds, adminId, adminName);
       return { success: true, count: input.shiftIds.length };
     }),
 });
@@ -987,33 +991,34 @@ const localAuthRouter = router({
     return { success: true };
   }),
 
-  /** Admin: list all local users. */
+    /** Admin: list all local users. */
   listUsers: publicProcedure.query(async ({ ctx }) => {
+    const isOAuthAdmin = ctx.user?.role === "admin";
     const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
     const session = await verifyLocalSession(token);
-    if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
     const users = await listLocalUsers();
     return users.map(u => ({ id: u.id, email: u.email, name: u.name, role: u.role, isActive: u.isActive, employeeId: u.employeeId, createdAt: u.createdAt, lastSignedIn: u.lastSignedIn }));
   }),
-
   /** Admin: activate or deactivate a user. */
   setActive: publicProcedure
     .input(z.object({ userId: z.number(), isActive: z.boolean() }))
     .mutation(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
       await setLocalUserActive(input.userId, input.isActive);
       return { success: true };
     }),
-
   /** Admin: change a user's role. */
   setRole: publicProcedure
     .input(z.object({ userId: z.number(), role: z.enum(["admin", "employee"]) }))
     .mutation(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
       await setLocalUserRole(input.userId, input.role);
       return { success: true };
     }),
@@ -1098,13 +1103,13 @@ const employeePortalRouter = router({
 
 // ─── Employee Allowlist Router ────────────────────────────────────────────────
 const allowlistRouter = router({
-  list: publicProcedure.query(async ({ ctx }) => {
+    list: publicProcedure.query(async ({ ctx }) => {
+    const isOAuthAdmin = ctx.user?.role === "admin";
     const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
     const session = await verifyLocalSession(token);
-    if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
     return listAllowlist();
   }),
-
   add: publicProcedure
     .input(z.object({
       email: z.string().email(),
@@ -1112,24 +1117,25 @@ const allowlistRouter = router({
       employeeName: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
       const entry = await addToAllowlist({
         email: input.email,
         employeeId: input.employeeId ?? null,
         employeeName: input.employeeName ?? null,
-        addedByAdminId: session.localUserId,
+        addedByAdminId: session?.localUserId ?? 0,
       });
       return entry;
     }),
-
   remove: publicProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
       await removeFromAllowlist(input.id);
       return { success: true };
     }),
