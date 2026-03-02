@@ -164,3 +164,18 @@
 - [x] Wire company profile into payroll PDF generator
 - [x] Write vitest tests for company profile procedures
 - [x] Save checkpoint
+
+## Email/Password Auth & Role-Based Access Control
+- [x] Audit existing auth (Manus OAuth) and design new parallel email/password auth
+- [x] Add auth_users table (email, passwordHash, role: admin|employee, employeeId FK, isActive)
+- [x] Add email_allowlist table (email, addedByAdminId, linkedEmployeeId, createdAt)
+- [x] Add DB helpers: createAuthUser, findAuthUserByEmail, updateAuthUser, listAllowlist, addToAllowlist, removeFromAllowlist
+- [x] Add tRPC procedures: auth.signup, auth.login, auth.logout, auth.me (email-based)
+- [x] Build Sign In page (/login) with email + password form
+- [x] Build Sign Up page (/signup) — only succeeds if email is on the allowlist or is the first admin
+- [x] Add Employee Allowlist settings page (admin adds/removes emails, links to employee record)
+- [x] Implement role-based route guards in App.tsx (admin vs employee)
+- [x] Build restricted Employee Portal (clock-in/out + own shift history only)
+- [x] Hide admin-only nav items from employee role
+- [x] Write vitest tests for new auth procedures
+- [x] Save checkpoint

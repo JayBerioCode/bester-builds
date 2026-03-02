@@ -78,6 +78,22 @@ import {
   getPayrollReport,
   getCompanyProfile,
   upsertCompanyProfile,
+  // Local auth
+  findLocalUserByEmail,
+  findLocalUserById,
+  createLocalUser,
+  touchLocalUserSignIn,
+  listLocalUsers,
+  setLocalUserActive,
+  setLocalUserRole,
+  countLocalAdmins,
+  verifyPassword,
+  // Allowlist
+  listAllowlist,
+  findAllowlistEntry,
+  addToAllowlist,
+  removeFromAllowlist,
+  markAllowlistSignedUp,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -779,6 +795,275 @@ const payrollRouter = router({
     }),
 });
 
+// ─── Local Auth Router ─────────────────────────────────────────────────────
+// Provides email/password sign-up, sign-in, and session management.
+// The JWT cookie is the same one used by Manus OAuth (same secret, same cookie name)
+// but the payload uses localUserId instead of openId.
+const LOCAL_AUTH_COOKIE = "bester_local_session";
+const ONE_YEAR_MS = 365 * 24 * 60 * 60 * 1000;
+
+import { SignJWT, jwtVerify } from "jose";
+
+async function signLocalSession(userId: number, role: string, name: string): Promise<string> {
+  const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret");
+  return new SignJWT({ localUserId: userId, role, name })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime(Math.floor((Date.now() + ONE_YEAR_MS) / 1000))
+    .sign(secret);
+}
+
+export async function verifyLocalSession(token: string | undefined): Promise<{ localUserId: number; role: string; name: string } | null> {
+  if (!token) return null;
+  try {
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET || "fallback-secret");
+    const { payload } = await jwtVerify(token, secret, { algorithms: ["HS256"] });
+    const { localUserId, role, name } = payload as Record<string, unknown>;
+    if (typeof localUserId !== "number" || typeof role !== "string" || typeof name !== "string") return null;
+    return { localUserId, role, name };
+  } catch {
+    return null;
+  }
+}
+
+const localAuthRouter = router({
+  /** Sign up with email + password. Admins can sign up freely if no admin exists yet.
+   *  Employees must have their email on the allowlist. */
+  signup: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      password: z.string().min(8, "Password must be at least 8 characters"),
+      name: z.string().min(1),
+      role: z.enum(["admin", "employee"]).default("employee"),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const email = input.email.toLowerCase().trim();
+
+      // Check if email already registered
+      const existing = await findLocalUserByEmail(email);
+      if (existing) throw new TRPCError({ code: "CONFLICT", message: "An account with this email already exists." });
+
+      let role = input.role;
+      let employeeId: number | null = null;
+
+      if (role === "admin") {
+        // First admin can sign up freely; subsequent admins must be promoted by existing admin
+        const adminCount = await countLocalAdmins();
+        if (adminCount > 0) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Admin accounts can only be created by an existing admin." });
+        }
+      } else {
+        // Employee: must be on the allowlist
+        const entry = await findAllowlistEntry(email);
+        if (!entry) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Your email is not on the employee access list. Please ask your admin to add you." });
+        }
+        if (entry.hasSignedUp) {
+          throw new TRPCError({ code: "CONFLICT", message: "An account for this email already exists." });
+        }
+        employeeId = entry.employeeId ?? null;
+      }
+
+      const user = await createLocalUser({ email, password: input.password, name: input.name, role, employeeId });
+
+      if (role === "employee") {
+        await markAllowlistSignedUp(email);
+      }
+
+      const token = await signLocalSession(user.id, user.role, user.name);
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(LOCAL_AUTH_COOKIE, token, { ...cookieOptions, maxAge: ONE_YEAR_MS, httpOnly: true });
+
+      return { success: true, role: user.role, name: user.name };
+    }),
+
+  /** Sign in with email + password. */
+  login: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      password: z.string().min(1),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const email = input.email.toLowerCase().trim();
+      const user = await findLocalUserByEmail(email);
+      if (!user) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+      if (!user.isActive) throw new TRPCError({ code: "FORBIDDEN", message: "Your account has been deactivated. Contact your admin." });
+
+      const valid = await verifyPassword(input.password, user.passwordHash);
+      if (!valid) throw new TRPCError({ code: "UNAUTHORIZED", message: "Invalid email or password." });
+
+      await touchLocalUserSignIn(user.id);
+      const token = await signLocalSession(user.id, user.role, user.name);
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.cookie(LOCAL_AUTH_COOKIE, token, { ...cookieOptions, maxAge: ONE_YEAR_MS, httpOnly: true });
+
+      return { success: true, role: user.role, name: user.name, employeeId: user.employeeId };
+    }),
+
+  /** Get the current local session user. */
+  me: publicProcedure.query(async ({ ctx }) => {
+    const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+    const session = await verifyLocalSession(token);
+    if (!session) return null;
+    const user = await findLocalUserById(session.localUserId);
+    if (!user || !user.isActive) return null;
+    return { id: user.id, email: user.email, name: user.name, role: user.role, employeeId: user.employeeId };
+  }),
+
+  /** Sign out of local session. */
+  logout: publicProcedure.mutation(({ ctx }) => {
+    const cookieOptions = getSessionCookieOptions(ctx.req);
+    ctx.res.clearCookie(LOCAL_AUTH_COOKIE, { ...cookieOptions, maxAge: -1 });
+    return { success: true };
+  }),
+
+  /** Admin: list all local users. */
+  listUsers: publicProcedure.query(async ({ ctx }) => {
+    const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+    const session = await verifyLocalSession(token);
+    if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    const users = await listLocalUsers();
+    return users.map(u => ({ id: u.id, email: u.email, name: u.name, role: u.role, isActive: u.isActive, employeeId: u.employeeId, createdAt: u.createdAt, lastSignedIn: u.lastSignedIn }));
+  }),
+
+  /** Admin: activate or deactivate a user. */
+  setActive: publicProcedure
+    .input(z.object({ userId: z.number(), isActive: z.boolean() }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await setLocalUserActive(input.userId, input.isActive);
+      return { success: true };
+    }),
+
+  /** Admin: change a user's role. */
+  setRole: publicProcedure
+    .input(z.object({ userId: z.number(), role: z.enum(["admin", "employee"]) }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await setLocalUserRole(input.userId, input.role);
+      return { success: true };
+    }),
+});
+
+// ─── Employee Portal Shifts Router (local-auth aware) ────────────────────────
+// These procedures accept the local session cookie so employees can clock in/out
+// without needing a Manus OAuth session.
+const employeePortalRouter = router({
+  /** Get active shift for the calling employee (local auth). */
+  activeShift: publicProcedure
+    .input(z.object({ employeeId: z.number() }))
+    .query(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      // Employees can only see their own shift; admins can see any
+      if (session.role === "employee") {
+        const user = await findLocalUserById(session.localUserId);
+        if (!user || user.employeeId !== input.employeeId) throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      return getActiveShift(input.employeeId);
+    }),
+
+  /** List shifts for the calling employee (local auth). */
+  list: publicProcedure
+    .input(z.object({ employeeId: z.number(), limit: z.number().optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      if (session.role === "employee") {
+        const user = await findLocalUserById(session.localUserId);
+        if (!user || (input?.employeeId && user.employeeId !== input.employeeId)) throw new TRPCError({ code: "FORBIDDEN" });
+        return getShiftLogs(user.employeeId ?? undefined, input?.limit);
+      }
+      return getShiftLogs(input?.employeeId, input?.limit);
+    }),
+
+  /** Clock in (local auth). */
+  clockIn: publicProcedure
+    .input(z.object({ employeeId: z.number(), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      if (session.role === "employee") {
+        const user = await findLocalUserById(session.localUserId);
+        if (!user || user.employeeId !== input.employeeId) throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      return clockIn(input.employeeId, input.notes);
+    }),
+
+  /** Clock out (local auth). */
+  clockOut: publicProcedure
+    .input(z.object({ shiftId: z.number(), employeeId: z.number(), notes: z.string().optional() }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      if (session.role === "employee") {
+        const user = await findLocalUserById(session.localUserId);
+        if (!user || user.employeeId !== input.employeeId) throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      return clockOut(input.shiftId, input.employeeId, input.notes);
+    }),
+
+  /** Get employee record (local auth). */
+  getEmployee: publicProcedure
+    .input(z.object({ employeeId: z.number() }))
+    .query(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      if (session.role === "employee") {
+        const user = await findLocalUserById(session.localUserId);
+        if (!user || user.employeeId !== input.employeeId) throw new TRPCError({ code: "FORBIDDEN" });
+      }
+      return getEmployeeById(input.employeeId);
+    }),
+});
+
+// ─── Employee Allowlist Router ────────────────────────────────────────────────
+const allowlistRouter = router({
+  list: publicProcedure.query(async ({ ctx }) => {
+    const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+    const session = await verifyLocalSession(token);
+    if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+    return listAllowlist();
+  }),
+
+  add: publicProcedure
+    .input(z.object({
+      email: z.string().email(),
+      employeeId: z.number().optional(),
+      employeeName: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const entry = await addToAllowlist({
+        email: input.email,
+        employeeId: input.employeeId ?? null,
+        employeeName: input.employeeName ?? null,
+        addedByAdminId: session.localUserId,
+      });
+      return entry;
+    }),
+
+  remove: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      await removeFromAllowlist(input.id);
+      return { success: true };
+    }),
+});
+
 // ─── App Router ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -804,6 +1089,9 @@ export const appRouter = router({
   jobCosting: jobCostingRouter,
   payroll: payrollRouter,
   company: companyRouter,
+  localAuth: localAuthRouter,
+  allowlist: allowlistRouter,
+  employeePortal: employeePortalRouter,
 });
 
 export type AppRouter = typeof appRouter;

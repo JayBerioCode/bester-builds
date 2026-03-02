@@ -20,6 +20,11 @@ import {
   pricingRates,
   inventoryJobUsage,
   companyProfile,
+  localUsers,
+  employeeAllowlist,
+  type LocalUser,
+  type InsertLocalUser,
+  type EmployeeAllowlist,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1277,4 +1282,158 @@ export async function upsertCompanyProfile(
   }
   const updated = await db.select().from(companyProfile).limit(1);
   return updated[0];
+}
+
+// ─── Local Auth: email + password ────────────────────────────────────────────
+
+/** Hash a plain-text password using bcrypt (12 rounds). */
+export async function hashPassword(password: string): Promise<string> {
+  return bcrypt.hash(password, 12);
+}
+
+/** Verify a plain-text password against a stored bcrypt hash. */
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return bcrypt.compare(password, hash);
+}
+
+/** Find a local user by email (case-insensitive). */
+export async function findLocalUserByEmail(email: string): Promise<LocalUser | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(localUsers)
+    .where(eq(localUsers.email, email.toLowerCase().trim()))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Find a local user by id. */
+export async function findLocalUserById(id: number): Promise<LocalUser | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(localUsers).where(eq(localUsers.id, id)).limit(1);
+  return rows[0] ?? null;
+}
+
+/** Create a new local user. Returns the inserted row. */
+export async function createLocalUser(data: {
+  email: string;
+  password: string;
+  name: string;
+  role: "admin" | "employee";
+  employeeId?: number | null;
+}): Promise<LocalUser> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  const passwordHash = await hashPassword(data.password);
+  await db.insert(localUsers).values({
+    email: data.email.toLowerCase().trim(),
+    passwordHash,
+    name: data.name,
+    role: data.role,
+    employeeId: data.employeeId ?? null,
+    isActive: true,
+  });
+  const created = await findLocalUserByEmail(data.email);
+  if (!created) throw new Error("Failed to create user");
+  return created;
+}
+
+/** Update lastSignedIn timestamp for a local user. */
+export async function touchLocalUserSignIn(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(localUsers).set({ lastSignedIn: new Date() }).where(eq(localUsers.id, id));
+}
+
+/** List all local users (admin view). */
+export async function listLocalUsers(): Promise<LocalUser[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(localUsers).orderBy(localUsers.createdAt);
+}
+
+/** Deactivate / reactivate a local user. */
+export async function setLocalUserActive(id: number, isActive: boolean): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(localUsers).set({ isActive }).where(eq(localUsers.id, id));
+}
+
+/** Update a local user's role. */
+export async function setLocalUserRole(id: number, role: "admin" | "employee"): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(localUsers).set({ role }).where(eq(localUsers.id, id));
+}
+
+/** Count how many admin-role local users exist (used to allow first-admin signup). */
+export async function countLocalAdmins(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const rows = await db
+    .select({ id: localUsers.id })
+    .from(localUsers)
+    .where(eq(localUsers.role, "admin"));
+  return rows.length;
+}
+
+// ─── Employee Allowlist ───────────────────────────────────────────────────────
+
+/** Get all allowlisted emails. */
+export async function listAllowlist(): Promise<EmployeeAllowlist[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(employeeAllowlist).orderBy(employeeAllowlist.createdAt);
+}
+
+/** Check if an email is on the allowlist. Returns the entry or null. */
+export async function findAllowlistEntry(email: string): Promise<EmployeeAllowlist | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(employeeAllowlist)
+    .where(eq(employeeAllowlist.email, email.toLowerCase().trim()))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** Add an email to the allowlist. */
+export async function addToAllowlist(data: {
+  email: string;
+  employeeId?: number | null;
+  employeeName?: string | null;
+  addedByAdminId?: number | null;
+}): Promise<EmployeeAllowlist> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.insert(employeeAllowlist).values({
+    email: data.email.toLowerCase().trim(),
+    employeeId: data.employeeId ?? null,
+    employeeName: data.employeeName ?? null,
+    addedByAdminId: data.addedByAdminId ?? null,
+    hasSignedUp: false,
+  });
+  const entry = await findAllowlistEntry(data.email);
+  if (!entry) throw new Error("Failed to add to allowlist");
+  return entry;
+}
+
+/** Remove an email from the allowlist. */
+export async function removeFromAllowlist(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(employeeAllowlist).where(eq(employeeAllowlist.id, id));
+}
+
+/** Mark an allowlist entry as signed-up (called after successful employee registration). */
+export async function markAllowlistSignedUp(email: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(employeeAllowlist)
+    .set({ hasSignedUp: true })
+    .where(eq(employeeAllowlist.email, email.toLowerCase().trim()));
 }

@@ -26,6 +26,43 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+// ─── Local Auth Users (email + password) ─────────────────────────────────────
+// Parallel auth system alongside Manus OAuth. Admins can sign up freely;
+// employees can only sign up if their email is on the allowlist.
+export const localUsers = mysqlTable("local_users", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  passwordHash: varchar("passwordHash", { length: 255 }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  /** 'admin' = full platform access; 'employee' = clock-in/out portal only */
+  role: mysqlEnum("role", ["admin", "employee"]).default("employee").notNull(),
+  /** FK to employees table — set when employee account is linked */
+  employeeId: int("employeeId"),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  lastSignedIn: timestamp("lastSignedIn"),
+});
+export type LocalUser = typeof localUsers.$inferSelect;
+export type InsertLocalUser = typeof localUsers.$inferInsert;
+
+// ─── Employee Email Allowlist ─────────────────────────────────────────────────
+// Admins add emails here. Only allowlisted emails can sign up as employees.
+export const employeeAllowlist = mysqlTable("employee_allowlist", {
+  id: int("id").autoincrement().primaryKey(),
+  email: varchar("email", { length: 320 }).notNull().unique(),
+  /** Optional: link to an existing employee record */
+  employeeId: int("employeeId"),
+  /** Display name hint shown during sign-up */
+  employeeName: varchar("employeeName", { length: 255 }),
+  addedByAdminId: int("addedByAdminId"),
+  /** Whether this email has already been used to create an account */
+  hasSignedUp: boolean("hasSignedUp").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EmployeeAllowlist = typeof employeeAllowlist.$inferSelect;
+export type InsertEmployeeAllowlist = typeof employeeAllowlist.$inferInsert;
+
 // ─── CRM: Customers ──────────────────────────────────────────────────────────
 export const customers = mysqlTable("customers", {
   id: int("id").autoincrement().primaryKey(),

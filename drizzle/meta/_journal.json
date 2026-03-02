@@ -50,6 +50,13 @@
       "when": 1772452946288,
       "tag": "0006_yummy_giant_girl",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1772453829693,
+      "tag": "0007_pretty_bug",
+      "breakpoints": true
     }
   ]
 }

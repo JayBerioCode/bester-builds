@@ -42,6 +42,8 @@ import {
   CheckSquare,
   Tag,
   Building2,
+  UserCog,
+  LogIn,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -87,6 +89,7 @@ const menuGroups = [
       { icon: Tag, label: "Pricing Rates", path: "/settings/pricing" },
       { icon: FileText, label: "Payroll Report", path: "/settings/payroll" },
       { icon: Building2, label: "Company Profile", path: "/settings/company" },
+      { icon: UserCog, label: "Employee Access", path: "/settings/employee-access" },
     ],
   },
 ];
