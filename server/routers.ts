@@ -1299,12 +1299,16 @@ const jobCardsRouter = router({
   update: protectedProcedure
     .input(z.object({
       id: z.number(),
+      jobTitle: z.string().optional(),
+      customerName: z.string().optional().nullable(),
+      poNumber: z.string().optional().nullable(),
       status: z.enum(["pending", "in_progress", "completed", "cancelled"]).optional(),
       assignedTo: z.number().optional().nullable(),
       assignedToName: z.string().optional().nullable(),
       dueDate: z.string().optional().nullable(),
       instructions: z.string().optional().nullable(),
       notes: z.string().optional().nullable(),
+      fileUrl: z.string().optional().nullable(),
       printType: z.string().optional().nullable(),
       width: z.string().optional().nullable(),
       height: z.string().optional().nullable(),

@@ -262,3 +262,10 @@
 - [x] Build ManualJobCardDialog with all fields (title, customer, PO, assignee, due date, print specs, instructions, notes, file URL)
 - [x] Manual job cards appear in list and kanban board alongside invoice-linked ones
 - [x] Save checkpoint
+
+## Full Job Card Editing
+- [x] Expand jobCards.update tRPC procedure to accept all editable fields (jobTitle, customerName, poNumber, status, assignedToName, dueDate, printType, width, height, dimensionUnit, quantity, material, finishing, instructions, notes, fileUrl)
+- [x] Replace UpdateStatusDialog with a full EditJobCardDialog pre-populated with all current field values
+- [x] Form re-syncs when a different job card is opened (useEffect on jc.id)
+- [x] Kanban board onUpdate opens the same full edit dialog
+- [x] Save checkpoint

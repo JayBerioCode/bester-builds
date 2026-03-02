@@ -364,43 +364,192 @@ function GenerateDialog({ open, onClose, preselectedInvoiceId }: { open: boolean
 // ─── Update Status Dialog ─────────────────────────────────────────────────────
 function UpdateStatusDialog({ jobCard, open, onClose }: { jobCard: any; open: boolean; onClose: () => void }) {
   const utils = trpc.useUtils();
-  const [status, setStatus] = useState(jobCard?.jobCard?.status ?? "pending");
+  const jc = jobCard?.jobCard ?? {};
+  const [form, setForm] = useState({
+    jobTitle: jc.jobTitle ?? "",
+    customerName: jc.customerName ?? "",
+    poNumber: jc.poNumber ?? "",
+    status: jc.status ?? "pending",
+    assignedToName: jc.assignedToName ?? "",
+    dueDate: jc.dueDate ? new Date(jc.dueDate).toISOString().split("T")[0] : "",
+    printType: jc.printType ?? "",
+    width: jc.width ?? "",
+    height: jc.height ?? "",
+    dimensionUnit: jc.dimensionUnit ?? "m",
+    quantity: String(jc.quantity ?? 1),
+    material: jc.material ?? "",
+    finishing: jc.finishing ?? "",
+    instructions: jc.instructions ?? "",
+    notes: jc.notes ?? "",
+    fileUrl: jc.fileUrl ?? "",
+  });
+
+  // Re-sync form when a different job card is opened
+  useEffect(() => {
+    if (open && jc.id) {
+      setForm({
+        jobTitle: jc.jobTitle ?? "",
+        customerName: jc.customerName ?? "",
+        poNumber: jc.poNumber ?? "",
+        status: jc.status ?? "pending",
+        assignedToName: jc.assignedToName ?? "",
+        dueDate: jc.dueDate ? new Date(jc.dueDate).toISOString().split("T")[0] : "",
+        printType: jc.printType ?? "",
+        width: jc.width ?? "",
+        height: jc.height ?? "",
+        dimensionUnit: jc.dimensionUnit ?? "m",
+        quantity: String(jc.quantity ?? 1),
+        material: jc.material ?? "",
+        finishing: jc.finishing ?? "",
+        instructions: jc.instructions ?? "",
+        notes: jc.notes ?? "",
+        fileUrl: jc.fileUrl ?? "",
+      });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, jc.id]);
 
   const updateMutation = trpc.jobCards.update.useMutation({
     onSuccess: () => {
       utils.jobCards.list.invalidate();
-      toast.success("Job card status updated.");
+      toast.success("Job card updated.");
       onClose();
     },
     onError: (err) => toast.error(err.message),
   });
 
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-sm">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Update Status — {jobCard?.jobCard?.jobCardNumber}</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-purple-500" />
+            Edit Job Card — {jc.jobCardNumber}
+          </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          <Label>Status</Label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="in_progress">In Progress</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="space-y-4 py-2">
+          {/* Core details */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-1.5">
+              <Label>Job Title <span className="text-red-500">*</span></Label>
+              <Input value={form.jobTitle} onChange={(e) => set("jobTitle", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Customer Name</Label>
+              <Input placeholder="Client or company name" value={form.customerName} onChange={(e) => set("customerName", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>PO Number</Label>
+              <Input placeholder="Optional" value={form.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Assigned To</Label>
+              <Input placeholder="Staff member name" value={form.assignedToName} onChange={(e) => set("assignedToName", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due Date</Label>
+              <Input type="date" value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
+            </div>
+            <div className="col-span-2 space-y-1.5">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          {/* Print specs */}
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Print Specifications</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Print Type</Label>
+                <Input placeholder="e.g. Vinyl Banner" value={form.printType} onChange={(e) => set("printType", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Quantity</Label>
+                <Input type="number" min="1" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Width</Label>
+                <Input placeholder="e.g. 3" value={form.width} onChange={(e) => set("width", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Height</Label>
+                <Input placeholder="e.g. 1.5" value={form.height} onChange={(e) => set("height", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Unit</Label>
+                <Select value={form.dimensionUnit} onValueChange={(v) => set("dimensionUnit", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="m">m</SelectItem>
+                    <SelectItem value="cm">cm</SelectItem>
+                    <SelectItem value="mm">mm</SelectItem>
+                    <SelectItem value="ft">ft</SelectItem>
+                    <SelectItem value="in">in</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Material</Label>
+                <Input placeholder="e.g. 440gsm PVC" value={form.material} onChange={(e) => set("material", e.target.value)} />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <Label>Finishing</Label>
+                <Input placeholder="e.g. Hemmed & eyeleted" value={form.finishing} onChange={(e) => set("finishing", e.target.value)} />
+              </div>
+            </div>
+          </div>
+          {/* Instructions & notes */}
+          <div className="border-t pt-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label>Production Instructions</Label>
+              <Textarea rows={3} value={form.instructions} onChange={(e) => set("instructions", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Internal Notes</Label>
+              <Textarea rows={2} value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Artwork File URL</Label>
+              <Input placeholder="https://…" value={form.fileUrl} onChange={(e) => set("fileUrl", e.target.value)} />
+            </div>
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>Cancel</Button>
           <Button
-            onClick={() => updateMutation.mutate({ id: jobCard.jobCard.id, status: status as any })}
-            disabled={updateMutation.isPending}
+            onClick={() => updateMutation.mutate({
+              id: jc.id,
+              jobTitle: form.jobTitle,
+              customerName: form.customerName || null,
+              poNumber: form.poNumber || null,
+              status: form.status as any,
+              assignedToName: form.assignedToName || null,
+              dueDate: form.dueDate || null,
+              printType: form.printType || null,
+              width: form.width || null,
+              height: form.height || null,
+              dimensionUnit: form.dimensionUnit || null,
+              quantity: parseInt(form.quantity) || 1,
+              material: form.material || null,
+              finishing: form.finishing || null,
+              instructions: form.instructions || null,
+              notes: form.notes || null,
+              fileUrl: form.fileUrl || null,
+            })}
+            disabled={!form.jobTitle.trim() || updateMutation.isPending}
             className="bg-purple-600 hover:bg-purple-700 text-white"
           >
-            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+            {updateMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save Changes"}
           </Button>
         </DialogFooter>
       </DialogContent>
