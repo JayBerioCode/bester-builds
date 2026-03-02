@@ -489,3 +489,67 @@ describe("shifts.exportTimesheet", () => {
     ).rejects.toThrow();
   });
 });
+
+// ─── PDF Invoice Generator Tests ─────────────────────────────────────────────
+import { generateInvoicePDF, type InvoiceData } from "./pdf";
+import { Writable } from "stream";
+
+describe("generateInvoicePDF", () => {
+  const sampleData: InvoiceData = {
+    invoice: {
+      invoiceNumber: "INV-2026-001",
+      status: "sent",
+      issueDate: new Date("2026-03-01"),
+      dueDate: new Date("2026-03-31"),
+      subtotal: "1000.00",
+      taxRate: "15",
+      taxAmount: "150.00",
+      discountAmount: "0.00",
+      total: "1150.00",
+      amountPaid: "0.00",
+      amountDue: "1150.00",
+      notes: "Thank you for your business.",
+      terms: "Payment due within 30 days.",
+    },
+    customer: {
+      name: "Acme Corp",
+      company: "Acme Corporation",
+      email: "billing@acme.com",
+      phone: "+27 11 000 0000",
+      address: "123 Main St",
+      city: "Johannesburg",
+      country: "South Africa",
+    },
+    order: { orderNumber: "ORD-001", title: "Banner Print 3x2m" },
+    lineItems: [
+      { description: "3x2m Vinyl Banner", quantity: "2", unitPrice: "500.00", total: "1000.00" },
+    ],
+  };
+
+  it("streams PDF bytes to the response without throwing", () => {
+    const mockRes = new Writable({
+      write(_chunk, _enc, cb) { cb(); },
+    }) as any;
+    mockRes.setHeader = () => {};
+    mockRes.pipe = () => {};
+    // generateInvoicePDF calls doc.pipe(res) then doc.end() — just verify no throw
+    expect(() => generateInvoicePDF(sampleData, mockRes)).not.toThrow();
+  });
+
+  it("handles an invoice with no line items gracefully", () => {
+    const mockRes = new Writable({ write(_c, _e, cb) { cb(); } }) as any;
+    mockRes.setHeader = () => {};
+    const data: InvoiceData = { ...sampleData, lineItems: [] };
+    expect(() => generateInvoicePDF(data, mockRes)).not.toThrow();
+  });
+
+  it("handles a paid invoice with amountPaid > 0", () => {
+    const mockRes = new Writable({ write(_c, _e, cb) { cb(); } }) as any;
+    mockRes.setHeader = () => {};
+    const data: InvoiceData = {
+      ...sampleData,
+      invoice: { ...sampleData.invoice, status: "paid", amountPaid: "1150.00", amountDue: "0.00" },
+    };
+    expect(() => generateInvoicePDF(data, mockRes)).not.toThrow();
+  });
+});

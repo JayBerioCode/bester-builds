@@ -757,3 +757,68 @@ export async function getTimesheetExport(
 
   return rows;
 }
+
+// ─── PDF Invoice Data ─────────────────────────────────────────────────────────
+export async function getInvoiceForPDF(invoiceId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  // Fetch invoice with customer
+  const rows = await db
+    .select({
+      invoice: invoices,
+      customer: customers,
+    })
+    .from(invoices)
+    .leftJoin(customers, eq(invoices.customerId, customers.id))
+    .where(eq(invoices.id, invoiceId))
+    .limit(1);
+
+  if (!rows.length || !rows[0]) return null;
+  const { invoice, customer } = rows[0];
+
+  // Fetch linked order (if any)
+  let order = null;
+  if (invoice.orderId) {
+    const orderRows = await db
+      .select({ id: orders.id, orderNumber: orders.orderNumber, title: orders.title })
+      .from(orders)
+      .where(eq(orders.id, invoice.orderId))
+      .limit(1);
+    if (orderRows.length) order = orderRows[0];
+  }
+
+  // Fetch line items from order_items (linked via orderId)
+  let lineItems: { description: string; quantity: string; unitPrice: string; total: string }[] = [];
+  if (invoice.orderId) {
+    const items = await db
+      .select({
+        description: orderItems.description,
+        quantity: orderItems.quantity,
+        unitPrice: orderItems.unitPrice,
+        total: orderItems.total,
+      })
+      .from(orderItems)
+      .where(eq(orderItems.orderId, invoice.orderId));
+    lineItems = items.map((i) => ({
+      description: i.description,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      total: i.total,
+    }));
+  }
+
+  // If no order items, create a single summary line from the invoice itself
+  if (!lineItems.length) {
+    lineItems = [
+      {
+        description: order ? `Print Job: ${order.title}` : "Printing Services",
+        quantity: "1",
+        unitPrice: invoice.subtotal,
+        total: invoice.subtotal,
+      },
+    ];
+  }
+
+  return { invoice, customer, order, lineItems };
+}

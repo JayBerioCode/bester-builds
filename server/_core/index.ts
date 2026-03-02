@@ -7,6 +7,8 @@ import { registerOAuthRoutes } from "./oauth";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { getInvoiceForPDF } from "../db";
+import { generateInvoicePDF } from "../pdf";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -35,6 +37,41 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
+  // PDF Invoice download route
+  app.get("/api/invoices/:id/pdf", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id)) {
+        res.status(400).json({ error: "Invalid invoice ID" });
+        return;
+      }
+      const data = await getInvoiceForPDF(id);
+      if (!data || !data.customer) {
+        res.status(404).json({ error: "Invoice not found" });
+        return;
+      }
+      const inv = data.invoice;
+      generateInvoicePDF(
+        {
+          invoice: {
+            ...inv,
+            taxRate: inv.taxRate ?? "0",
+            taxAmount: inv.taxAmount ?? "0",
+            discountAmount: inv.discountAmount ?? "0",
+            amountPaid: inv.amountPaid ?? "0",
+          },
+          customer: data.customer,
+          order: data.order ?? null,
+          lineItems: data.lineItems,
+        },
+        res
+      );
+    } catch (err) {
+      console.error("[PDF] Error generating invoice:", err);
+      res.status(500).json({ error: "Failed to generate PDF" });
+    }
+  });
+
   // tRPC API
   app.use(
     "/api/trpc",

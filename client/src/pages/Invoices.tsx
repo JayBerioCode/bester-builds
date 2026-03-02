@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, FileText, Search } from "lucide-react";
+import { Plus, FileText, Search, Download } from "lucide-react";
 
 const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -239,6 +239,22 @@ export default function Invoices() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs gap-1 bg-background"
+                      onClick={() => {
+                        const url = `/api/invoices/${inv.id}/pdf`;
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `invoice-${inv.invoiceNumber}.pdf`;
+                        a.click();
+                        toast.success(`Downloading invoice ${inv.invoiceNumber}...`);
+                      }}
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      PDF
+                    </Button>
                     <Select
                       value={inv.status}
                       onValueChange={(v) => updateInvoice.mutate({ id: inv.id, status: v as any })}

@@ -84,3 +84,12 @@
 - [x] Show preview table of shifts before export
 - [x] Write vitest tests for exportTimesheet procedure
 - [x] Save checkpoint
+
+## Branded PDF Invoice Generator
+- [x] Install pdfkit npm package for server-side PDF generation
+- [x] Create server/pdf.ts with generateInvoicePDF() helper using PDFKit
+- [x] Register GET /api/invoices/:id/pdf Express route in server/_core/index.ts
+- [x] Add Download PDF button to Invoices page
+- [x] Style PDF: Bester.Builds header, client block, line items table, totals, payment info
+- [x] Write vitest test for the PDF route
+- [ ] Save checkpoint
