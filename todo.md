@@ -60,3 +60,6 @@
 - [x] Add ClockIn route and sidebar navigation entry
 - [x] Write vitest tests for clock-in/out procedures
 - [x] Save checkpoint
+
+## Bug Fixes
+- [x] Fix "Maximum update depth exceeded" infinite loop on /clock-in page

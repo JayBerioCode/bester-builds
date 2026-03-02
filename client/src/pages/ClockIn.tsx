@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import DashboardLayout from "@/components/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -33,15 +32,15 @@ function formatHours(val: string | number | null | undefined) {
   return `${(n ?? 0).toFixed(2)} hrs`;
 }
 
-function useLiveTimer(clockInTime: Date | null) {
+function useLiveTimer(clockInTimestamp: number | null) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
-    if (!clockInTime) { setElapsed(0); return; }
-    const tick = () => setElapsed(Date.now() - new Date(clockInTime).getTime());
+    if (!clockInTimestamp) { setElapsed(0); return; }
+    const tick = () => setElapsed(Date.now() - clockInTimestamp);
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [clockInTime]);
+  }, [clockInTimestamp]);
   return elapsed;
 }
 
@@ -123,8 +122,14 @@ export default function ClockIn() {
     onError: (err) => toast.error(err.message),
   });
 
-  const clockInTime = activeShift?.clockIn ? new Date(activeShift.clockIn) : null;
-  const elapsed = useLiveTimer(clockInTime);
+  // Stabilise the clock-in timestamp as a primitive (number) so the useEffect
+  // dependency in useLiveTimer never changes reference on every re-render.
+  const clockInTimestamp = useMemo(
+    () => (activeShift?.clockIn ? new Date(activeShift.clockIn).getTime() : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeShift?.id, activeShift?.clockIn]
+  );
+  const elapsed = useLiveTimer(clockInTimestamp);
 
   const selectedEmployee = useMemo(
     () => employees.find((e) => e.id === selectedEmployeeId),
@@ -139,8 +144,7 @@ export default function ClockIn() {
   const activeCount = employees.filter((e) => e.status === "active").length;
 
   return (
-    <DashboardLayout>
-      <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
         {/* Header */}
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
@@ -471,7 +475,7 @@ export default function ClockIn() {
             )}
           </div>
         </div>
-      </div>
-    </DashboardLayout>
+    </div>
   );
 }
+
