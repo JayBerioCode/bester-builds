@@ -67,6 +67,9 @@ vi.mock("./db", () => ({
   clockInByPin: vi.fn().mockResolvedValue({ employee: { id: 1, name: "John Doe", role: "print_operator", pinSet: true, status: "active", hourlyRate: "75.00" }, shift: { id: 2, employeeId: 1, clockIn: new Date(), clockOut: null, hoursWorked: null, earnings: null, notes: null } }),
   clockOutByPin: vi.fn().mockResolvedValue({ employee: { id: 1, name: "John Doe", role: "print_operator", pinSet: true, status: "active", hourlyRate: "75.00" }, shift: { id: 2, employeeId: 1, clockIn: new Date(Date.now() - 3600000), clockOut: new Date(), hoursWorked: "1.00", earnings: "75.00", notes: null } }),
   hashPin: vi.fn().mockResolvedValue("$2b$10$hashedpin"),
+  getTimesheetExport: vi.fn().mockResolvedValue([
+    { shiftId: 1, employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", department: "Production", hourlyRate: "75.00", clockIn: new Date("2026-03-01T08:00:00Z"), clockOut: new Date("2026-03-01T16:00:00Z"), hoursWorked: "8.00", earnings: "600.00", notes: null },
+  ]),
 }));
 
 // ─── Auth context factory ─────────────────────────────────────────────────────
@@ -454,5 +457,35 @@ describe("shifts.clockOutByPin", () => {
     expect(result).toBeDefined();
     expect((result as any).shift.hoursWorked).toBe("1.00");
     expect((result as any).shift.earnings).toBe("75.00");
+  });
+});
+
+// ─── Timesheet Export Tests ───────────────────────────────────────────────────
+describe("shifts.exportTimesheet", () => {
+  it("returns shift rows for a given date range", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.exportTimesheet({
+      from: new Date("2026-01-01"),
+      to: new Date("2026-12-31"),
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("accepts an optional employeeId filter", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.exportTimesheet({
+      from: new Date("2026-01-01"),
+      to: new Date("2026-12-31"),
+      employeeId: 1,
+    });
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("requires authentication", async () => {
+    const publicCtx = { ...makeCtx(), user: null };
+    const caller = appRouter.createCaller(publicCtx);
+    await expect(
+      caller.shifts.exportTimesheet({ from: new Date("2026-01-01"), to: new Date("2026-12-31") })
+    ).rejects.toThrow();
   });
 });

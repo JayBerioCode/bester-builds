@@ -75,3 +75,12 @@
 - [x] Add Kiosk link to sidebar under Team
 - [x] Write vitest tests for PIN procedures
 - [x] Save checkpoint
+
+## Timesheet CSV Export Feature
+- [x] Add getTimesheetExport DB helper (date range + optional employeeId, returns full shift rows with employee details)
+- [x] Add shifts.exportTimesheet tRPC procedure
+- [x] Add TimesheetExport section to ClockIn page with date-range pickers and employee filter
+- [x] Implement client-side CSV generation and download (no server file needed)
+- [x] Show preview table of shifts before export
+- [x] Write vitest tests for exportTimesheet procedure
+- [x] Save checkpoint

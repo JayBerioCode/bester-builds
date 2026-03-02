@@ -61,6 +61,7 @@ import {
   clockInByPin,
   clockOutByPin,
   findEmployeeByPin,
+  getTimesheetExport,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -581,6 +582,15 @@ const shiftsRouter = router({
       pin: z.string().length(4),
     }))
     .mutation(({ input }) => clockOutByPin(input.pin)),
+
+  /** Export timesheet data for a date range (payroll CSV) */
+  exportTimesheet: protectedProcedure
+    .input(z.object({
+      from: z.date(),
+      to: z.date(),
+      employeeId: z.number().optional(),
+    }))
+    .query(({ input }) => getTimesheetExport(input.from, input.to, input.employeeId)),
 });
 
 // ─── App Router ──────────────────────────────────────────────────────────────

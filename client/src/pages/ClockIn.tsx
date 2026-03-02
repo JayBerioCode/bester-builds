@@ -18,8 +18,11 @@ import {
   CalendarDays,
   Banknote,
   AlertCircle,
+  Download,
+  FileSpreadsheet,
+  Filter,
 } from "lucide-react";
-import { format, formatDuration, intervalToDuration } from "date-fns";
+import { format, formatDuration, intervalToDuration, startOfMonth, endOfMonth } from "date-fns";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function formatMoney(val: string | number | null | undefined) {
@@ -51,6 +54,224 @@ function formatElapsed(ms: number) {
   const m = Math.floor((totalSec % 3600) / 60).toString().padStart(2, "0");
   const s = (totalSec % 60).toString().padStart(2, "0");
   return `${h}:${m}:${s}`;
+}
+
+// ─── CSV Export Helper ───────────────────────────────────────────────────────
+function generateCSV(rows: any[]): string {
+  const headers = [
+    "Employee Name",
+    "Role",
+    "Department",
+    "Date",
+    "Clock In",
+    "Clock Out",
+    "Hours Worked",
+    "Hourly Rate (R)",
+    "Earnings (R)",
+    "Notes",
+  ];
+
+  const escape = (val: string | null | undefined) => {
+    const s = String(val ?? "");
+    return s.includes(",") || s.includes('"') || s.includes("\n")
+      ? `"${s.replace(/"/g, '""')}"`
+      : s;
+  };
+
+  const dataRows = rows.map((r) => [
+    escape(r.employeeName),
+    escape(r.employeeRole?.replace(/_/g, " ")),
+    escape(r.department),
+    escape(r.clockIn ? format(new Date(r.clockIn), "dd/MM/yyyy") : ""),
+    escape(r.clockIn ? format(new Date(r.clockIn), "HH:mm") : ""),
+    escape(r.clockOut ? format(new Date(r.clockOut), "HH:mm") : ""),
+    escape(r.hoursWorked ? parseFloat(r.hoursWorked).toFixed(2) : ""),
+    escape(r.hourlyRate ? parseFloat(r.hourlyRate).toFixed(2) : ""),
+    escape(r.earnings ? parseFloat(r.earnings).toFixed(2) : ""),
+    escape(r.notes),
+  ]);
+
+  return [headers.join(","), ...dataRows.map((row) => row.join(","))].join("\n");
+}
+
+function downloadCSV(content: string, filename: string) {
+  const blob = new Blob([content], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Timesheet Export Panel ───────────────────────────────────────────────────
+function TimesheetExportPanel({ employees }: { employees: any[] }) {
+  const today = new Date();
+  const [from, setFrom] = useState(() => startOfMonth(today));
+  const [to, setTo] = useState(() => endOfMonth(today));
+  const [filterEmployeeId, setFilterEmployeeId] = useState<number | undefined>(undefined);
+  const [enabled, setEnabled] = useState(false);
+
+  const { data: rows = [], isFetching, refetch } = trpc.shifts.exportTimesheet.useQuery(
+    { from, to, employeeId: filterEmployeeId },
+    { enabled }
+  );
+
+  const handlePreview = () => {
+    setEnabled(true);
+    refetch();
+  };
+
+  const handleExport = () => {
+    if (rows.length === 0) {
+      toast.error("No completed shifts found for the selected period.");
+      return;
+    }
+    const fromStr = format(from, "yyyy-MM-dd");
+    const toStr = format(to, "yyyy-MM-dd");
+    const empLabel = filterEmployeeId
+      ? employees.find((e) => e.id === filterEmployeeId)?.name?.replace(/\s+/g, "_") ?? "employee"
+      : "all_employees";
+    const filename = `timesheet_${empLabel}_${fromStr}_to_${toStr}.csv`;
+    downloadCSV(generateCSV(rows), filename);
+    toast.success(`Exported ${rows.length} shift(s) to ${filename}`);
+  };
+
+  // Totals from preview data
+  const totalHours = rows.reduce((acc: number, r: any) => acc + parseFloat(r.hoursWorked ?? "0"), 0);
+  const totalEarnings = rows.reduce((acc: number, r: any) => acc + parseFloat(r.earnings ?? "0"), 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          <FileSpreadsheet className="w-4 h-4 text-primary" />
+          Timesheet Export
+        </CardTitle>
+        <CardDescription>Generate a payroll-ready CSV for any date range</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Filters row */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="space-y-1.5">
+            <Label className="text-xs">From Date</Label>
+            <input
+              type="date"
+              value={format(from, "yyyy-MM-dd")}
+              onChange={(e) => { setFrom(new Date(e.target.value)); setEnabled(false); }}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">To Date</Label>
+            <input
+              type="date"
+              value={format(to, "yyyy-MM-dd")}
+              onChange={(e) => { setTo(new Date(e.target.value)); setEnabled(false); }}
+              className="w-full h-9 rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-1 focus:ring-ring"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Employee (optional)</Label>
+            <Select
+              value={filterEmployeeId ? String(filterEmployeeId) : "all"}
+              onValueChange={(v) => { setFilterEmployeeId(v === "all" ? undefined : Number(v)); setEnabled(false); }}
+            >
+              <SelectTrigger className="h-9 text-sm">
+                <SelectValue placeholder="All employees" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Employees</SelectItem>
+                {employees.map((e) => (
+                  <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handlePreview} disabled={isFetching}>
+            <Filter className="w-3.5 h-3.5 mr-1" />
+            {isFetching ? "Loading..." : "Preview"}
+          </Button>
+          <Button size="sm" onClick={handleExport} disabled={!enabled || rows.length === 0 || isFetching}>
+            <Download className="w-3.5 h-3.5 mr-1" />
+            Export CSV ({rows.length} shift{rows.length !== 1 ? "s" : ""})
+          </Button>
+        </div>
+
+        {/* Summary totals */}
+        {enabled && !isFetching && rows.length > 0 && (
+          <div className="flex gap-4 p-3 rounded-lg bg-muted/50 text-sm">
+            <div>
+              <span className="text-muted-foreground">Shifts: </span>
+              <span className="font-semibold">{rows.length}</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Total Hours: </span>
+              <span className="font-semibold">{totalHours.toFixed(2)} hrs</span>
+            </div>
+            <div>
+              <span className="text-muted-foreground">Total Earnings: </span>
+              <span className="font-semibold text-green-600">R {totalEarnings.toFixed(2)}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Preview table */}
+        {enabled && !isFetching && rows.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-4">
+            No completed shifts found for the selected period.
+          </p>
+        )}
+
+        {enabled && !isFetching && rows.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b text-muted-foreground uppercase tracking-wide">
+                  <th className="text-left pb-2 font-medium">Employee</th>
+                  <th className="text-left pb-2 font-medium">Date</th>
+                  <th className="text-left pb-2 font-medium">In</th>
+                  <th className="text-left pb-2 font-medium">Out</th>
+                  <th className="text-right pb-2 font-medium">Hours</th>
+                  <th className="text-right pb-2 font-medium">Rate</th>
+                  <th className="text-right pb-2 font-medium">Earned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: any) => (
+                  <tr key={r.shiftId} className="border-b last:border-0 hover:bg-muted/30">
+                    <td className="py-1.5 font-medium">{r.employeeName}</td>
+                    <td className="py-1.5 text-muted-foreground">
+                      {r.clockIn ? format(new Date(r.clockIn), "dd MMM") : ""}
+                    </td>
+                    <td className="py-1.5">
+                      {r.clockIn ? format(new Date(r.clockIn), "HH:mm") : ""}
+                    </td>
+                    <td className="py-1.5">
+                      {r.clockOut ? format(new Date(r.clockOut), "HH:mm") : "—"}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      {r.hoursWorked ? parseFloat(r.hoursWorked).toFixed(2) : "—"}
+                    </td>
+                    <td className="py-1.5 text-right text-muted-foreground">
+                      {r.hourlyRate ? `R${parseFloat(r.hourlyRate).toFixed(0)}` : "—"}
+                    </td>
+                    <td className="py-1.5 text-right font-semibold text-green-600">
+                      {r.earnings ? `R ${parseFloat(r.earnings).toFixed(2)}` : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
@@ -401,6 +622,9 @@ export default function ClockIn() {
                 )}
               </CardContent>
             </Card>
+
+            {/* Timesheet Export */}
+            <TimesheetExportPanel employees={employees} />
 
             {/* Individual shift log */}
             {selectedEmployeeId && (

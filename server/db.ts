@@ -706,3 +706,54 @@ export async function clockOutByPin(pin: string) {
 
   return { employee: emp, shift: updated };
 }
+
+// ─── Timesheet Export Helper ──────────────────────────────────────────────────
+
+/**
+ * Returns all completed shifts within a date range, joined with employee details.
+ * Used for payroll CSV export.
+ */
+export async function getTimesheetExport(
+  from: Date,
+  to: Date,
+  employeeId?: number
+) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Set `to` to end of day so the full last day is included
+  const toEndOfDay = new Date(to);
+  toEndOfDay.setHours(23, 59, 59, 999);
+
+  const conditions = [
+    gte(shiftLogs.clockIn, from),
+    lte(shiftLogs.clockIn, toEndOfDay),
+    // Only include completed shifts (clockOut is not null)
+    sql`${shiftLogs.clockOut} IS NOT NULL`,
+  ];
+
+  if (employeeId) {
+    conditions.push(eq(shiftLogs.employeeId, employeeId));
+  }
+
+  const rows = await db
+    .select({
+      shiftId: shiftLogs.id,
+      employeeId: shiftLogs.employeeId,
+      employeeName: employees.name,
+      employeeRole: employees.role,
+      department: employees.department,
+      hourlyRate: employees.hourlyRate,
+      clockIn: shiftLogs.clockIn,
+      clockOut: shiftLogs.clockOut,
+      hoursWorked: shiftLogs.hoursWorked,
+      earnings: shiftLogs.earnings,
+      notes: shiftLogs.notes,
+    })
+    .from(shiftLogs)
+    .leftJoin(employees, eq(shiftLogs.employeeId, employees.id))
+    .where(and(...conditions))
+    .orderBy(shiftLogs.clockIn);
+
+  return rows;
+}
