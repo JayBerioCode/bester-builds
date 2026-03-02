@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
+import { JobCardKanban } from "@/components/JobCardKanban";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,8 @@ import {
   Printer,
   Calendar,
   User,
+  LayoutList,
+  Columns,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -412,6 +415,14 @@ export default function JobCardGenerator() {
   const [updateTarget, setUpdateTarget] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">(
+    () => (localStorage.getItem("jobcards-view") as "list" | "kanban") ?? "list"
+  );
+
+  const handleViewMode = (mode: "list" | "kanban") => {
+    setViewMode(mode);
+    localStorage.setItem("jobcards-view", mode);
+  };
 
   // Read ?invoiceId=X from URL and auto-open the dialog
   useEffect(() => {
@@ -428,9 +439,33 @@ export default function JobCardGenerator() {
     }
   }, []);
 
+  const utils = trpc.useUtils();
   const { data: jobCards = [], isLoading } = trpc.jobCards.list.useQuery(
-    activeTab === "all" ? undefined : { status: activeTab },
+    viewMode === "kanban" ? undefined : (activeTab === "all" ? undefined : { status: activeTab }),
     { refetchInterval: 30_000 }
+  );
+  const updateStatusMutation = trpc.jobCards.update.useMutation({
+    onMutate: async ({ id, status }) => {
+      await utils.jobCards.list.cancel();
+      const prev = utils.jobCards.list.getData();
+      utils.jobCards.list.setData(undefined, (old: any) =>
+        old?.map((jc: any) =>
+          jc.jobCard?.id === id ? { ...jc, jobCard: { ...jc.jobCard, status } } : jc
+        )
+      );
+      return { prev };
+    },
+    onError: (_err, _vars, ctx) => {
+      if (ctx?.prev) utils.jobCards.list.setData(undefined, ctx.prev);
+      toast.error("Failed to update status");
+    },
+    onSettled: () => utils.jobCards.list.invalidate(),
+  });
+  const handleKanbanStatusChange = useCallback(
+    (id: number, newStatus: string) => {
+      updateStatusMutation.mutate({ id, status: newStatus as any });
+    },
+    [updateStatusMutation]
   );
 
   const filtered = (jobCards as any[]).filter((jc) => {
@@ -463,13 +498,40 @@ export default function JobCardGenerator() {
             Generate printable job cards from invoices with purchase order numbers.
           </p>
         </div>
-        <Button
-          onClick={() => setGenerateOpen(true)}
-          className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
-        >
-          <Plus className="w-4 h-4" />
-          New Job Card
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex items-center border rounded-lg overflow-hidden">
+            <button
+              onClick={() => handleViewMode("list")}
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
+                viewMode === "list"
+                  ? "bg-purple-600 text-white"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <LayoutList className="w-4 h-4" />
+              List
+            </button>
+            <button
+              onClick={() => handleViewMode("kanban")}
+              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
+                viewMode === "kanban"
+                  ? "bg-purple-600 text-white"
+                  : "text-muted-foreground hover:bg-muted"
+              }`}
+            >
+              <Columns className="w-4 h-4" />
+              Kanban
+            </button>
+          </div>
+          <Button
+            onClick={() => setGenerateOpen(true)}
+            className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+          >
+            <Plus className="w-4 h-4" />
+            New Job Card
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -509,8 +571,8 @@ export default function JobCardGenerator() {
         </div>
       </div>
 
-      {/* Tabs + Table */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {/* Tabs + Table (List view) */}
+      {viewMode === "list" && <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
           <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
@@ -631,7 +693,24 @@ export default function JobCardGenerator() {
             </CardContent>
           </Card>
         </TabsContent>
-      </Tabs>
+       </Tabs>}
+
+      {/* Kanban view */}
+      {viewMode === "kanban" && (
+        <div>
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+            </div>
+          ) : (
+            <JobCardKanban
+              jobCards={jobCards as any[]}
+              onStatusChange={handleKanbanStatusChange}
+              onUpdate={(item) => setUpdateTarget(item)}
+            />
+          )}
+        </div>
+      )}
 
       {/* Dialogs */}
       <GenerateDialog open={generateOpen} onClose={() => { setGenerateOpen(false); setPreselectedInvoiceId(undefined); }} preselectedInvoiceId={preselectedInvoiceId} />

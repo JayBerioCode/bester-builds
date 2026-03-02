@@ -237,3 +237,11 @@
 - [x] Add PO number to invoice PDF details block (right column, below Due Date)
 - [x] Add PO number to payment reference line in the payment info box
 - [x] Save checkpoint
+
+## Job Cards Kanban Board
+- [x] Install @dnd-kit/core and @dnd-kit/utilities for drag-and-drop
+- [x] Build KanbanBoard component with Pending/In Progress/Completed/Cancelled columns
+- [x] Make job cards draggable between columns with optimistic status update on drop
+- [x] Add list/kanban view toggle to Job Cards page header
+- [x] Persist view preference in localStorage
+- [x] Save checkpoint
