@@ -1,11 +1,25 @@
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
-import { ENV } from './_core/env';
+import {
+  InsertUser,
+  appointments,
+  customers,
+  employees,
+  interactions,
+  inventoryItems,
+  inventoryTransactions,
+  invoices,
+  leads,
+  orderItems,
+  orders,
+  payments,
+  tasks,
+  users,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
@@ -18,75 +32,440 @@ export async function getDb() {
   return _db;
 }
 
+// ─── Users ───────────────────────────────────────────────────────────────────
 export async function upsertUser(user: InsertUser): Promise<void> {
-  if (!user.openId) {
-    throw new Error("User openId is required for upsert");
-  }
-
+  if (!user.openId) throw new Error("User openId is required for upsert");
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot upsert user: database not available");
-    return;
+  if (!db) return;
+
+  const values: InsertUser = { openId: user.openId };
+  const updateSet: Record<string, unknown> = {};
+  const textFields = ["name", "email", "loginMethod"] as const;
+
+  textFields.forEach((field) => {
+    const value = user[field];
+    if (value === undefined) return;
+    const normalized = value ?? null;
+    values[field] = normalized;
+    updateSet[field] = normalized;
+  });
+
+  if (user.lastSignedIn !== undefined) {
+    values.lastSignedIn = user.lastSignedIn;
+    updateSet.lastSignedIn = user.lastSignedIn;
+  }
+  if (user.role !== undefined) {
+    values.role = user.role;
+    updateSet.role = user.role;
+  } else if (user.openId === ENV.ownerOpenId) {
+    values.role = "admin";
+    updateSet.role = "admin";
   }
 
-  try {
-    const values: InsertUser = {
-      openId: user.openId,
-    };
-    const updateSet: Record<string, unknown> = {};
+  if (!values.lastSignedIn) values.lastSignedIn = new Date();
+  if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
 
-    const textFields = ["name", "email", "loginMethod"] as const;
-    type TextField = (typeof textFields)[number];
-
-    const assignNullable = (field: TextField) => {
-      const value = user[field];
-      if (value === undefined) return;
-      const normalized = value ?? null;
-      values[field] = normalized;
-      updateSet[field] = normalized;
-    };
-
-    textFields.forEach(assignNullable);
-
-    if (user.lastSignedIn !== undefined) {
-      values.lastSignedIn = user.lastSignedIn;
-      updateSet.lastSignedIn = user.lastSignedIn;
-    }
-    if (user.role !== undefined) {
-      values.role = user.role;
-      updateSet.role = user.role;
-    } else if (user.openId === ENV.ownerOpenId) {
-      values.role = 'admin';
-      updateSet.role = 'admin';
-    }
-
-    if (!values.lastSignedIn) {
-      values.lastSignedIn = new Date();
-    }
-
-    if (Object.keys(updateSet).length === 0) {
-      updateSet.lastSignedIn = new Date();
-    }
-
-    await db.insert(users).values(values).onDuplicateKeyUpdate({
-      set: updateSet,
-    });
-  } catch (error) {
-    console.error("[Database] Failed to upsert user:", error);
-    throw error;
-  }
+  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
-  if (!db) {
-    console.warn("[Database] Cannot get user: database not available");
-    return undefined;
-  }
-
+  if (!db) return undefined;
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
-
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// ─── CRM: Customers ──────────────────────────────────────────────────────────
+export async function getCustomers(search?: string, status?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (search) conditions.push(or(like(customers.name, `%${search}%`), like(customers.company, `%${search}%`), like(customers.email, `%${search}%`)));
+  if (status) conditions.push(eq(customers.status, status as any));
+  return db.select().from(customers).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(customers.createdAt));
+}
+
+export async function getCustomerById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(customers).where(eq(customers.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createCustomer(data: typeof customers.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(customers).values(data);
+  return result;
+}
+
+export async function updateCustomer(id: number, data: Partial<typeof customers.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(customers).set(data).where(eq(customers.id, id));
+}
+
+export async function deleteCustomer(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.delete(customers).where(eq(customers.id, id));
+}
+
+// ─── CRM: Interactions ───────────────────────────────────────────────────────
+export async function getInteractionsByCustomer(customerId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(interactions).where(eq(interactions.customerId, customerId)).orderBy(desc(interactions.createdAt));
+}
+
+export async function createInteraction(data: typeof interactions.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.insert(interactions).values(data);
+}
+
+// ─── CRM: Leads ──────────────────────────────────────────────────────────────
+export async function getLeads(stage?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = stage ? [eq(leads.stage, stage as any)] : [];
+  return db.select().from(leads).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(leads.createdAt));
+}
+
+export async function createLead(data: typeof leads.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.insert(leads).values(data);
+}
+
+export async function updateLead(id: number, data: Partial<typeof leads.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(leads).set(data).where(eq(leads.id, id));
+}
+
+export async function deleteLead(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.delete(leads).where(eq(leads.id, id));
+}
+
+// ─── Inventory ───────────────────────────────────────────────────────────────
+export async function getInventoryItems(category?: string, lowStock?: boolean) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (category) conditions.push(eq(inventoryItems.category, category as any));
+  if (lowStock) conditions.push(sql`${inventoryItems.currentStock} <= ${inventoryItems.minStockLevel}`);
+  return db.select().from(inventoryItems).where(conditions.length ? and(...conditions) : undefined).orderBy(inventoryItems.name);
+}
+
+export async function getInventoryItemById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(inventoryItems).where(eq(inventoryItems.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createInventoryItem(data: typeof inventoryItems.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.insert(inventoryItems).values(data);
+}
+
+export async function updateInventoryItem(id: number, data: Partial<typeof inventoryItems.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(inventoryItems).set(data).where(eq(inventoryItems.id, id));
+}
+
+export async function deleteInventoryItem(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.delete(inventoryItems).where(eq(inventoryItems.id, id));
+}
+
+export async function getInventoryTransactions(itemId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(inventoryTransactions).where(eq(inventoryTransactions.itemId, itemId)).orderBy(desc(inventoryTransactions.createdAt));
+}
+
+export async function createInventoryTransaction(data: typeof inventoryTransactions.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const item = await getInventoryItemById(data.itemId);
+  if (!item) throw new Error("Item not found");
+  const qty = parseFloat(data.quantity as string);
+  const current = parseFloat(item.currentStock as string);
+  let newStock = current;
+  if (data.type === "purchase" || data.type === "return") newStock = current + qty;
+  else if (data.type === "usage" || data.type === "waste") newStock = current - qty;
+  else if (data.type === "adjustment") newStock = qty;
+  await db.update(inventoryItems).set({ currentStock: newStock.toString() }).where(eq(inventoryItems.id, data.itemId));
+  return db.insert(inventoryTransactions).values(data);
+}
+
+// ─── Orders ──────────────────────────────────────────────────────────────────
+export async function getOrders(status?: string, customerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (status) conditions.push(eq(orders.status, status as any));
+  if (customerId) conditions.push(eq(orders.customerId, customerId));
+  return db.select().from(orders).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(orders.createdAt));
+}
+
+export async function getOrderById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(orders).where(eq(orders.id, id)).limit(1);
+  return result[0];
+}
+
+export async function getOrderItems(orderId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(orderItems).where(eq(orderItems.orderId, orderId));
+}
+
+export async function createOrder(data: typeof orders.$inferInsert, items: typeof orderItems.$inferInsert[]) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(orders).values(data);
+  const insertId = (result as any)[0]?.insertId;
+  if (items.length > 0 && insertId) {
+    await db.insert(orderItems).values(items.map((i) => ({ ...i, orderId: insertId })));
+  }
+  return insertId;
+}
+
+export async function updateOrder(id: number, data: Partial<typeof orders.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(orders).set(data).where(eq(orders.id, id));
+}
+
+export async function deleteOrder(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  await db.delete(orderItems).where(eq(orderItems.orderId, id));
+  return db.delete(orders).where(eq(orders.id, id));
+}
+
+// ─── Invoices ────────────────────────────────────────────────────────────────
+export async function getInvoices(status?: string, customerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (status) conditions.push(eq(invoices.status, status as any));
+  if (customerId) conditions.push(eq(invoices.customerId, customerId));
+  return db.select().from(invoices).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(invoices.createdAt));
+}
+
+export async function getInvoiceById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(invoices).where(eq(invoices.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createInvoice(data: typeof invoices.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.insert(invoices).values(data);
+}
+
+export async function updateInvoice(id: number, data: Partial<typeof invoices.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(invoices).set(data).where(eq(invoices.id, id));
+}
+
+// ─── Employees ───────────────────────────────────────────────────────────────
+export async function getEmployees(status?: string) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = status ? [eq(employees.status, status as any)] : [];
+  return db.select().from(employees).where(conditions.length ? and(...conditions) : undefined).orderBy(employees.name);
+}
+
+export async function getEmployeeById(id: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(employees).where(eq(employees.id, id)).limit(1);
+  return result[0];
+}
+
+export async function createEmployee(data: typeof employees.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.insert(employees).values(data);
+}
+
+export async function updateEmployee(id: number, data: Partial<typeof employees.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(employees).set(data).where(eq(employees.id, id));
+}
+
+export async function deleteEmployee(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.delete(employees).where(eq(employees.id, id));
+}
+
+// ─── Tasks ───────────────────────────────────────────────────────────────────
+export async function getTasks(status?: string, assignedTo?: number, orderId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (status) conditions.push(eq(tasks.status, status as any));
+  if (assignedTo) conditions.push(eq(tasks.assignedTo, assignedTo));
+  if (orderId) conditions.push(eq(tasks.orderId, orderId));
+  return db.select().from(tasks).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(tasks.createdAt));
+}
+
+export async function createTask(data: typeof tasks.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.insert(tasks).values(data);
+}
+
+export async function updateTask(id: number, data: Partial<typeof tasks.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(tasks).set(data).where(eq(tasks.id, id));
+}
+
+export async function deleteTask(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.delete(tasks).where(eq(tasks.id, id));
+}
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+export async function getPayments(status?: string, customerId?: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (status) conditions.push(eq(payments.status, status as any));
+  if (customerId) conditions.push(eq(payments.customerId, customerId));
+  return db.select().from(payments).where(conditions.length ? and(...conditions) : undefined).orderBy(desc(payments.createdAt));
+}
+
+export async function createPayment(data: typeof payments.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(payments).values(data);
+  // Update invoice amountPaid and amountDue
+  if (data.status === "completed" && data.invoiceId) {
+    const invoice = await getInvoiceById(data.invoiceId);
+    if (invoice) {
+      const paid = parseFloat(invoice.amountPaid as string) + parseFloat(data.amount as string);
+      const due = parseFloat(invoice.total as string) - paid;
+      const newStatus = due <= 0 ? "paid" : paid > 0 ? "partial" : invoice.status;
+      await updateInvoice(data.invoiceId, { amountPaid: paid.toString(), amountDue: Math.max(0, due).toString(), status: newStatus as any });
+    }
+  }
+  return result;
+}
+
+export async function updatePayment(id: number, data: Partial<typeof payments.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(payments).set(data).where(eq(payments.id, id));
+}
+
+// ─── Appointments ────────────────────────────────────────────────────────────
+export async function getAppointments(status?: string, from?: Date, to?: Date) {
+  const db = await getDb();
+  if (!db) return [];
+  const conditions = [];
+  if (status) conditions.push(eq(appointments.status, status as any));
+  if (from) conditions.push(gte(appointments.startTime, from));
+  if (to) conditions.push(lte(appointments.startTime, to));
+  return db.select().from(appointments).where(conditions.length ? and(...conditions) : undefined).orderBy(appointments.startTime);
+}
+
+export async function createAppointment(data: typeof appointments.$inferInsert) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.insert(appointments).values(data);
+}
+
+export async function updateAppointment(id: number, data: Partial<typeof appointments.$inferInsert>) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.update(appointments).set(data).where(eq(appointments.id, id));
+}
+
+export async function deleteAppointment(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  return db.delete(appointments).where(eq(appointments.id, id));
+}
+
+// ─── Analytics ───────────────────────────────────────────────────────────────
+export async function getAnalyticsSummary() {
+  const db = await getDb();
+  if (!db) return null;
+
+  const [totalCustomers] = await db.select({ count: sql<number>`count(*)` }).from(customers);
+  const [totalOrders] = await db.select({ count: sql<number>`count(*)` }).from(orders);
+  const [activeOrders] = await db.select({ count: sql<number>`count(*)` }).from(orders).where(
+    or(eq(orders.status, "confirmed"), eq(orders.status, "in_production"), eq(orders.status, "quality_check"), eq(orders.status, "ready"))
+  );
+  const [totalRevenue] = await db.select({ sum: sql<string>`COALESCE(SUM(amount), 0)` }).from(payments).where(eq(payments.status, "completed"));
+  const [pendingInvoices] = await db.select({ count: sql<number>`count(*)` }).from(invoices).where(
+    or(eq(invoices.status, "sent"), eq(invoices.status, "overdue"), eq(invoices.status, "partial"))
+  );
+  const [lowStockItems] = await db.select({ count: sql<number>`count(*)` }).from(inventoryItems).where(
+    sql`${inventoryItems.currentStock} <= ${inventoryItems.minStockLevel}`
+  );
+  const [activeEmployees] = await db.select({ count: sql<number>`count(*)` }).from(employees).where(eq(employees.status, "active"));
+  const [pendingTasks] = await db.select({ count: sql<number>`count(*)` }).from(tasks).where(
+    or(eq(tasks.status, "pending"), eq(tasks.status, "in_progress"))
+  );
+
+  return {
+    totalCustomers: totalCustomers?.count ?? 0,
+    totalOrders: totalOrders?.count ?? 0,
+    activeOrders: activeOrders?.count ?? 0,
+    totalRevenue: parseFloat(totalRevenue?.sum ?? "0"),
+    pendingInvoices: pendingInvoices?.count ?? 0,
+    lowStockItems: lowStockItems?.count ?? 0,
+    activeEmployees: activeEmployees?.count ?? 0,
+    pendingTasks: pendingTasks?.count ?? 0,
+  };
+}
+
+export async function getRevenueByMonth() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    month: sql<string>`DATE_FORMAT(paidAt, '%Y-%m')`,
+    revenue: sql<string>`SUM(amount)`,
+    count: sql<number>`count(*)`,
+  }).from(payments).where(eq(payments.status, "completed")).groupBy(sql`DATE_FORMAT(paidAt, '%Y-%m')`).orderBy(sql`DATE_FORMAT(paidAt, '%Y-%m')`).limit(12);
+}
+
+export async function getOrdersByStatus() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    status: orders.status,
+    count: sql<number>`count(*)`,
+  }).from(orders).groupBy(orders.status);
+}
+
+export async function getTopCustomers() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select({
+    id: customers.id,
+    name: customers.name,
+    company: customers.company,
+    totalSpent: customers.totalSpent,
+  }).from(customers).orderBy(desc(customers.totalSpent)).limit(10);
+}

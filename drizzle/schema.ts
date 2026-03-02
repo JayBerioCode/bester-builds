@@ -1,17 +1,18 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+  decimal,
+  boolean,
+  json,
+} from "drizzle-orm/mysql-core";
 
-/**
- * Core user table backing auth flow.
- * Extend this file with additional tables as your product grows.
- * Columns use camelCase to match both database fields and generated types.
- */
+// ─── Users / Auth ───────────────────────────────────────────────────────────
 export const users = mysqlTable("users", {
-  /**
-   * Surrogate primary key. Auto-incremented numeric value managed by the database.
-   * Use this for relations between tables.
-   */
   id: int("id").autoincrement().primaryKey(),
-  /** Manus OAuth identifier (openId) returned from the OAuth callback. Unique per user. */
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
@@ -25,4 +26,262 @@ export const users = mysqlTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
-// TODO: Add your tables here
+// ─── CRM: Customers ──────────────────────────────────────────────────────────
+export const customers = mysqlTable("customers", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  company: varchar("company", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 50 }),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  country: varchar("country", { length: 100 }),
+  status: mysqlEnum("status", ["active", "inactive", "prospect"]).default("prospect").notNull(),
+  customerType: mysqlEnum("customerType", ["individual", "business", "reseller"]).default("individual").notNull(),
+  notes: text("notes"),
+  totalSpent: decimal("totalSpent", { precision: 12, scale: 2 }).default("0.00"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Customer = typeof customers.$inferSelect;
+export type InsertCustomer = typeof customers.$inferInsert;
+
+// ─── CRM: Interactions ───────────────────────────────────────────────────────
+export const interactions = mysqlTable("interactions", {
+  id: int("id").autoincrement().primaryKey(),
+  customerId: int("customerId").notNull(),
+  type: mysqlEnum("type", ["call", "email", "meeting", "quote", "follow_up", "complaint", "other"]).notNull(),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  notes: text("notes"),
+  outcome: varchar("outcome", { length: 255 }),
+  nextFollowUp: timestamp("nextFollowUp"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Interaction = typeof interactions.$inferSelect;
+export type InsertInteraction = typeof interactions.$inferInsert;
+
+// ─── CRM: Leads ──────────────────────────────────────────────────────────────
+export const leads = mysqlTable("leads", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  company: varchar("company", { length: 255 }),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 50 }),
+  source: mysqlEnum("source", ["website", "referral", "social_media", "cold_call", "trade_show", "other"]).default("other").notNull(),
+  stage: mysqlEnum("stage", ["new", "contacted", "qualified", "proposal", "negotiation", "won", "lost"]).default("new").notNull(),
+  estimatedValue: decimal("estimatedValue", { precision: 12, scale: 2 }),
+  printingNeeds: text("printingNeeds"),
+  assignedTo: int("assignedTo"),
+  notes: text("notes"),
+  convertedToCustomer: boolean("convertedToCustomer").default(false),
+  customerId: int("customerId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Lead = typeof leads.$inferSelect;
+export type InsertLead = typeof leads.$inferInsert;
+
+// ─── Inventory: Items ────────────────────────────────────────────────────────
+export const inventoryItems = mysqlTable("inventory_items", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 255 }).notNull(),
+  sku: varchar("sku", { length: 100 }).unique(),
+  category: mysqlEnum("category", ["paper", "vinyl", "fabric", "ink", "substrate", "laminate", "hardware", "consumable", "equipment", "other"]).notNull(),
+  description: text("description"),
+  unit: varchar("unit", { length: 50 }).default("unit"),
+  currentStock: decimal("currentStock", { precision: 10, scale: 2 }).default("0"),
+  minStockLevel: decimal("minStockLevel", { precision: 10, scale: 2 }).default("0"),
+  maxStockLevel: decimal("maxStockLevel", { precision: 10, scale: 2 }),
+  unitCost: decimal("unitCost", { precision: 10, scale: 2 }).default("0.00"),
+  unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).default("0.00"),
+  supplier: varchar("supplier", { length: 255 }),
+  supplierSku: varchar("supplierSku", { length: 100 }),
+  location: varchar("location", { length: 100 }),
+  isActive: boolean("isActive").default(true),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type InventoryItem = typeof inventoryItems.$inferSelect;
+export type InsertInventoryItem = typeof inventoryItems.$inferInsert;
+
+// ─── Inventory: Transactions ─────────────────────────────────────────────────
+export const inventoryTransactions = mysqlTable("inventory_transactions", {
+  id: int("id").autoincrement().primaryKey(),
+  itemId: int("itemId").notNull(),
+  type: mysqlEnum("type", ["purchase", "usage", "adjustment", "return", "waste"]).notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitCost: decimal("unitCost", { precision: 10, scale: 2 }),
+  reference: varchar("reference", { length: 255 }),
+  notes: text("notes"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type InventoryTransaction = typeof inventoryTransactions.$inferSelect;
+export type InsertInventoryTransaction = typeof inventoryTransactions.$inferInsert;
+
+// ─── Orders ──────────────────────────────────────────────────────────────────
+export const orders = mysqlTable("orders", {
+  id: int("id").autoincrement().primaryKey(),
+  orderNumber: varchar("orderNumber", { length: 50 }).notNull().unique(),
+  customerId: int("customerId").notNull(),
+  status: mysqlEnum("status", ["quote", "confirmed", "in_production", "quality_check", "ready", "dispatched", "delivered", "cancelled"]).default("quote").notNull(),
+  priority: mysqlEnum("priority", ["low", "normal", "high", "urgent"]).default("normal").notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  printType: mysqlEnum("printType", ["banner", "poster", "signage", "vehicle_wrap", "canvas", "fabric", "wallpaper", "floor_graphic", "window_graphic", "other"]).default("other"),
+  width: decimal("width", { precision: 8, scale: 2 }),
+  height: decimal("height", { precision: 8, scale: 2 }),
+  dimensionUnit: mysqlEnum("dimensionUnit", ["mm", "cm", "m", "inch", "ft"]).default("m"),
+  quantity: int("quantity").default(1),
+  material: varchar("material", { length: 255 }),
+  finishing: varchar("finishing", { length: 255 }),
+  fileUrl: text("fileUrl"),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).default("0.00"),
+  taxRate: decimal("taxRate", { precision: 5, scale: 2 }).default("0.00"),
+  taxAmount: decimal("taxAmount", { precision: 12, scale: 2 }).default("0.00"),
+  discountAmount: decimal("discountAmount", { precision: 12, scale: 2 }).default("0.00"),
+  total: decimal("total", { precision: 12, scale: 2 }).default("0.00"),
+  dueDate: timestamp("dueDate"),
+  deliveryMethod: mysqlEnum("deliveryMethod", ["pickup", "delivery", "courier"]).default("pickup"),
+  deliveryAddress: text("deliveryAddress"),
+  assignedTo: int("assignedTo"),
+  notes: text("notes"),
+  internalNotes: text("internalNotes"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Order = typeof orders.$inferSelect;
+export type InsertOrder = typeof orders.$inferInsert;
+
+// ─── Order Items ─────────────────────────────────────────────────────────────
+export const orderItems = mysqlTable("order_items", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  description: varchar("description", { length: 255 }).notNull(),
+  quantity: decimal("quantity", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).notNull(),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull(),
+  inventoryItemId: int("inventoryItemId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type OrderItem = typeof orderItems.$inferSelect;
+export type InsertOrderItem = typeof orderItems.$inferInsert;
+
+// ─── Invoices ────────────────────────────────────────────────────────────────
+export const invoices = mysqlTable("invoices", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceNumber: varchar("invoiceNumber", { length: 50 }).notNull().unique(),
+  orderId: int("orderId"),
+  customerId: int("customerId").notNull(),
+  status: mysqlEnum("status", ["draft", "sent", "viewed", "partial", "paid", "overdue", "cancelled"]).default("draft").notNull(),
+  subtotal: decimal("subtotal", { precision: 12, scale: 2 }).notNull(),
+  taxRate: decimal("taxRate", { precision: 5, scale: 2 }).default("0.00"),
+  taxAmount: decimal("taxAmount", { precision: 12, scale: 2 }).default("0.00"),
+  discountAmount: decimal("discountAmount", { precision: 12, scale: 2 }).default("0.00"),
+  total: decimal("total", { precision: 12, scale: 2 }).notNull(),
+  amountPaid: decimal("amountPaid", { precision: 12, scale: 2 }).default("0.00"),
+  amountDue: decimal("amountDue", { precision: 12, scale: 2 }).notNull(),
+  issueDate: timestamp("issueDate").defaultNow().notNull(),
+  dueDate: timestamp("dueDate").notNull(),
+  notes: text("notes"),
+  terms: text("terms"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = typeof invoices.$inferInsert;
+
+// ─── Employees ───────────────────────────────────────────────────────────────
+export const employees = mysqlTable("employees", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId"),
+  name: varchar("name", { length: 255 }).notNull(),
+  email: varchar("email", { length: 320 }),
+  phone: varchar("phone", { length: 50 }),
+  role: mysqlEnum("role", ["manager", "print_operator", "designer", "sales", "delivery", "admin", "other"]).notNull(),
+  department: varchar("department", { length: 100 }),
+  status: mysqlEnum("status", ["active", "inactive", "on_leave"]).default("active").notNull(),
+  hireDate: timestamp("hireDate"),
+  hourlyRate: decimal("hourlyRate", { precision: 8, scale: 2 }),
+  skills: text("skills"),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Employee = typeof employees.$inferSelect;
+export type InsertEmployee = typeof employees.$inferInsert;
+
+// ─── Tasks ───────────────────────────────────────────────────────────────────
+export const tasks = mysqlTable("tasks", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  orderId: int("orderId"),
+  assignedTo: int("assignedTo"),
+  status: mysqlEnum("status", ["pending", "in_progress", "review", "completed", "cancelled"]).default("pending").notNull(),
+  priority: mysqlEnum("priority", ["low", "normal", "high", "urgent"]).default("normal").notNull(),
+  category: mysqlEnum("category", ["design", "printing", "finishing", "quality_check", "delivery", "admin", "other"]).default("other"),
+  estimatedHours: decimal("estimatedHours", { precision: 6, scale: 2 }),
+  actualHours: decimal("actualHours", { precision: 6, scale: 2 }),
+  dueDate: timestamp("dueDate"),
+  completedAt: timestamp("completedAt"),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Task = typeof tasks.$inferSelect;
+export type InsertTask = typeof tasks.$inferInsert;
+
+// ─── Payments ────────────────────────────────────────────────────────────────
+export const payments = mysqlTable("payments", {
+  id: int("id").autoincrement().primaryKey(),
+  invoiceId: int("invoiceId").notNull(),
+  customerId: int("customerId").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  method: mysqlEnum("method", ["cash", "card", "bank_transfer", "eft", "cheque", "online", "other"]).notNull(),
+  status: mysqlEnum("status", ["pending", "completed", "failed", "refunded"]).default("pending").notNull(),
+  reference: varchar("reference", { length: 255 }),
+  notes: text("notes"),
+  paidAt: timestamp("paidAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = typeof payments.$inferInsert;
+
+// ─── Appointments ────────────────────────────────────────────────────────────
+export const appointments = mysqlTable("appointments", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 255 }).notNull(),
+  type: mysqlEnum("type", ["client_consultation", "production", "delivery", "equipment_maintenance", "team_meeting", "other"]).notNull(),
+  customerId: int("customerId"),
+  orderId: int("orderId"),
+  assignedTo: int("assignedTo"),
+  status: mysqlEnum("status", ["scheduled", "confirmed", "in_progress", "completed", "cancelled", "rescheduled"]).default("scheduled").notNull(),
+  startTime: timestamp("startTime").notNull(),
+  endTime: timestamp("endTime").notNull(),
+  location: varchar("location", { length: 255 }),
+  description: text("description"),
+  notes: text("notes"),
+  reminderSent: boolean("reminderSent").default(false),
+  createdBy: int("createdBy"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Appointment = typeof appointments.$inferSelect;
+export type InsertAppointment = typeof appointments.$inferInsert;
