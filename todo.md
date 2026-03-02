@@ -275,3 +275,10 @@
 - [x] Replaced with sentinel values "unassigned" and "no_order"
 - [x] Updated mutation to treat sentinels as undefined (no assignment / no order)
 - [x] Save checkpoint
+
+## Bug Fix: FORBIDDEN on /shifts/approval and /notifications for Manus OAuth admin
+- [x] Confirmed shifts.listForApproval already had the dual-auth fix (isOAuthAdmin check)
+- [x] Found notifications.listAll at line 1192 was missing the isOAuthAdmin check
+- [x] Applied dual-auth fix to notifications.listAll
+- [x] Confirmed all other LOCAL_AUTH_COOKIE guards already have the isOAuthAdmin check
+- [x] Save checkpoint

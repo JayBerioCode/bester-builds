@@ -1187,9 +1187,10 @@ const notificationsRouter = router({
   listAll: publicProcedure
     .input(z.object({ limit: z.number().optional() }).optional())
     .query(async ({ input, ctx }) => {
+      const isOAuthAdmin = ctx.user?.role === "admin";
       const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
       const session = await verifyLocalSession(token);
-      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isOAuthAdmin && (!session || session.role !== "admin")) throw new TRPCError({ code: "FORBIDDEN" });
       return listAllNotifications(input?.limit);
     }),
 });
