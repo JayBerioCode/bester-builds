@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, ClipboardList, Search, Trash2, Edit, ChevronRight } from "lucide-react";
+import { Plus, ClipboardList, Search, Trash2, ChevronRight, FileText } from "lucide-react";
+import { useLocation } from "wouter";
 
 const statusColors: Record<string, string> = {
   quote: "bg-gray-100 text-gray-600",
@@ -213,6 +214,8 @@ export default function Orders() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [editOrder, setEditOrder] = useState<any>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [convertingOrderId, setConvertingOrderId] = useState<number | null>(null);
+  const [, navigate] = useLocation();
 
   const utils = trpc.useUtils();
   const { data: orders = [], isLoading } = trpc.orders.list.useQuery({
@@ -224,6 +227,18 @@ export default function Orders() {
   });
   const updateOrder = trpc.orders.update.useMutation({
     onSuccess: () => { utils.orders.list.invalidate(); toast.success("Status updated"); },
+  });
+  const convertToInvoice = trpc.orders.convertToInvoice.useMutation({
+    onSuccess: (invoice) => {
+      utils.orders.list.invalidate();
+      toast.success(`Invoice ${invoice?.invoiceNumber ?? ""} created successfully!`, {
+        description: "Order advanced to Confirmed. Redirecting to Invoices...",
+        duration: 3000,
+      });
+      setConvertingOrderId(null);
+      setTimeout(() => navigate("/invoices"), 1500);
+    },
+    onError: (e) => { toast.error(e.message); setConvertingOrderId(null); },
   });
 
   const filtered = orders.filter((o) =>
@@ -336,7 +351,27 @@ export default function Orders() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      {nextStatus && order.status !== "cancelled" && (
+                      {/* One-click quote-to-invoice conversion */}
+                      {order.status === "quote" && (
+                        <Button
+                          size="sm"
+                          className="text-xs bg-violet-600 hover:bg-violet-700 text-white gap-1"
+                          disabled={convertingOrderId === order.id}
+                          onClick={() => {
+                            if (!confirm(`Convert "${order.title}" to an invoice?\n\nThis will:\n• Create a new draft invoice\n• Advance the order to Confirmed\n\nTotal: R ${parseFloat(order.total as string || "0").toLocaleString()}`)) return;
+                            setConvertingOrderId(order.id);
+                            convertToInvoice.mutate({
+                              orderId: order.id,
+                              taxRate: "15",
+                              dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+                            });
+                          }}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          {convertingOrderId === order.id ? "Creating..." : "Create Invoice"}
+                        </Button>
+                      )}
+                      {nextStatus && order.status !== "cancelled" && order.status !== "quote" && (
                         <Button
                           variant="outline"
                           size="sm"

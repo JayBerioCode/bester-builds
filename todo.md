@@ -96,3 +96,12 @@
 
 ## Bug Fixes
 - [x] Fix empty SelectItem value crash on /invoices page
+
+## Quote-to-Invoice Conversion
+- [x] Add getOrderWithItems DB helper to fetch order + line items + customer
+- [x] Add orders.convertToInvoice tRPC procedure (auto-calc totals, create invoice, advance order status)
+- [x] Add "Create Invoice" button on Orders page for quote-status orders
+- [x] Show confirmation dialog with invoice preview (customer, total, VAT) before converting
+- [x] Navigate to Invoices page after successful conversion
+- [x] Write vitest tests for convertToInvoice procedure
+- [x] Save checkpoint

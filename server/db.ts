@@ -822,3 +822,84 @@ export async function getInvoiceForPDF(invoiceId: number) {
 
   return { invoice, customer, order, lineItems };
 }
+
+// ─── Quote-to-Invoice Conversion ─────────────────────────────────────────────
+export async function getOrderWithItemsForInvoice(orderId: number) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const orderRows = await db
+    .select({ order: orders, customer: customers })
+    .from(orders)
+    .leftJoin(customers, eq(orders.customerId, customers.id))
+    .where(eq(orders.id, orderId))
+    .limit(1);
+
+  if (!orderRows.length || !orderRows[0]) return null;
+  const { order, customer } = orderRows[0];
+
+  const items = await db
+    .select()
+    .from(orderItems)
+    .where(eq(orderItems.orderId, orderId));
+
+  return { order, customer, items };
+}
+
+export async function createInvoiceFromOrder(
+  orderId: number,
+  invoiceNumber: string,
+  dueDate: Date,
+  taxRate: string,
+  terms?: string
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+
+  const data = await getOrderWithItemsForInvoice(orderId);
+  if (!data || !data.order) throw new Error("Order not found");
+  if (!data.customer) throw new Error("Customer not found");
+
+  const order = data.order;
+
+  // Use order totals directly (already calculated when order was created)
+  const subtotal = order.subtotal ?? "0.00";
+  const rate = parseFloat(taxRate);
+  const sub = parseFloat(subtotal);
+  const taxAmt = ((sub * rate) / 100).toFixed(2);
+  const disc = parseFloat(order.discountAmount ?? "0") || 0;
+  const total = (sub + parseFloat(taxAmt) - disc).toFixed(2);
+
+  // Insert the invoice
+  await db.insert(invoices).values({
+    invoiceNumber,
+    orderId,
+    customerId: order.customerId,
+    status: "draft",
+    subtotal,
+    taxRate,
+    taxAmount: taxAmt,
+    discountAmount: order.discountAmount ?? "0.00",
+    total,
+    amountPaid: "0.00",
+    amountDue: total,
+    dueDate,
+    notes: order.notes ?? null,
+    terms: terms ?? "Payment due within 30 days. Late payments subject to 2% monthly interest.",
+  });
+
+  // Advance order status from quote → confirmed
+  await db
+    .update(orders)
+    .set({ status: "confirmed", updatedAt: new Date() })
+    .where(eq(orders.id, orderId));
+
+  // Fetch the newly created invoice
+  const newInvoice = await db
+    .select()
+    .from(invoices)
+    .where(eq(invoices.invoiceNumber, invoiceNumber))
+    .limit(1);
+
+  return newInvoice[0] ?? null;
+}

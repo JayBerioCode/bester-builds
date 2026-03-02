@@ -62,6 +62,8 @@ import {
   clockOutByPin,
   findEmployeeByPin,
   getTimesheetExport,
+  createInvoiceFromOrder,
+  getOrderWithItemsForInvoice,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -308,6 +310,29 @@ const ordersRouter = router({
   delete: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(({ input }) => deleteOrder(input.id)),
+
+  // One-click quote-to-invoice conversion
+  getForInvoice: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .query(({ input }) => getOrderWithItemsForInvoice(input.id)),
+
+  convertToInvoice: protectedProcedure
+    .input(z.object({
+      orderId: z.number(),
+      taxRate: z.string().default("15"),
+      dueDate: z.date(),
+      terms: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const invoiceNumber = `INV-${Date.now().toString().slice(-6)}`;
+      return createInvoiceFromOrder(
+        input.orderId,
+        invoiceNumber,
+        input.dueDate,
+        input.taxRate,
+        input.terms
+      );
+    }),
 });
 
 // ─── Invoices Router ─────────────────────────────────────────────────────────

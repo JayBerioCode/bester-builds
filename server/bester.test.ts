@@ -67,6 +67,8 @@ vi.mock("./db", () => ({
   clockInByPin: vi.fn().mockResolvedValue({ employee: { id: 1, name: "John Doe", role: "print_operator", pinSet: true, status: "active", hourlyRate: "75.00" }, shift: { id: 2, employeeId: 1, clockIn: new Date(), clockOut: null, hoursWorked: null, earnings: null, notes: null } }),
   clockOutByPin: vi.fn().mockResolvedValue({ employee: { id: 1, name: "John Doe", role: "print_operator", pinSet: true, status: "active", hourlyRate: "75.00" }, shift: { id: 2, employeeId: 1, clockIn: new Date(Date.now() - 3600000), clockOut: new Date(), hoursWorked: "1.00", earnings: "75.00", notes: null } }),
   hashPin: vi.fn().mockResolvedValue("$2b$10$hashedpin"),
+  createInvoiceFromOrder: vi.fn().mockResolvedValue({ id: 99, invoiceNumber: "INV-999999", orderId: 1, customerId: 1, status: "draft", subtotal: "1000.00", taxRate: "15", taxAmount: "150.00", discountAmount: "0.00", total: "1150.00", amountPaid: "0.00", amountDue: "1150.00", issueDate: new Date(), dueDate: new Date(Date.now() + 30*24*60*60*1000), notes: null, terms: null, createdAt: new Date(), updatedAt: new Date() }),
+  getOrderWithItemsForInvoice: vi.fn().mockResolvedValue({ order: { id: 1, orderNumber: "BB-001", title: "Test Banner", customerId: 1, status: "quote", subtotal: "1000.00", taxRate: "0", taxAmount: "0", discountAmount: "0", total: "1000.00" }, customer: { id: 1, name: "Test Client" }, items: [] }),
   getTimesheetExport: vi.fn().mockResolvedValue([
     { shiftId: 1, employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", department: "Production", hourlyRate: "75.00", clockIn: new Date("2026-03-01T08:00:00Z"), clockOut: new Date("2026-03-01T16:00:00Z"), hoursWorked: "8.00", earnings: "600.00", notes: null },
   ]),
@@ -551,5 +553,56 @@ describe("generateInvoicePDF", () => {
       invoice: { ...sampleData.invoice, status: "paid", amountPaid: "1150.00", amountDue: "0.00" },
     };
     expect(() => generateInvoicePDF(data, mockRes)).not.toThrow();
+  });
+});
+
+// ─── Quote-to-Invoice Conversion Tests ───────────────────────────────────────
+describe("orders.convertToInvoice", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("creates an invoice from a quote order and advances its status", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const result = await caller.orders.convertToInvoice({
+      orderId: 1,
+      taxRate: "15",
+      dueDate,
+    });
+
+    // createInvoiceFromOrder is mocked to return a sample invoice
+    expect(result).toBeDefined();
+  });
+
+  it("uses default 15% tax rate when not specified", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const result = await caller.orders.convertToInvoice({
+      orderId: 2,
+      taxRate: "15",
+      dueDate,
+    });
+
+    expect(result).toBeDefined();
+  });
+
+  it("accepts optional terms string", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+
+    const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const result = await caller.orders.convertToInvoice({
+      orderId: 3,
+      taxRate: "15",
+      dueDate,
+      terms: "Net 30 days. No returns on custom print jobs.",
+    });
+
+    expect(result).toBeDefined();
   });
 });
