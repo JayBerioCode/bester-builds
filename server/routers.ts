@@ -71,6 +71,10 @@ import {
   createPricingRate,
   updatePricingRate,
   deletePricingRate,
+  logJobMaterialUsage,
+  getJobUsageByOrder,
+  deleteJobUsageEntry,
+  getJobCostingReport,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -643,6 +647,39 @@ const shiftsRouter = router({
     .query(({ input }) => getTimesheetExport(input.from, input.to, input.employeeId)),
 });
 
+// ─── Job Costing Router ─────────────────────────────────────────────────────────
+const jobCostingRouter = router({
+  report: protectedProcedure
+    .input(
+      z.object({
+        from: z.date().optional(),
+        to: z.date().optional(),
+      }).optional()
+    )
+    .query(({ input }) => getJobCostingReport(input?.from, input?.to)),
+
+  getUsageByOrder: protectedProcedure
+    .input(z.object({ orderId: z.number() }))
+    .query(({ input }) => getJobUsageByOrder(input.orderId)),
+
+  logUsage: protectedProcedure
+    .input(
+      z.object({
+        orderId: z.number(),
+        inventoryItemId: z.number(),
+        quantityUsed: z.string(),
+        unitCost: z.string(),
+        totalCost: z.string(),
+        notes: z.string().optional(),
+      })
+    )
+    .mutation(({ input }) => logJobMaterialUsage(input)),
+
+  deleteUsage: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ input }) => deleteJobUsageEntry(input.id)),
+});
+
 // ─── Pricing Router ─────────────────────────────────────────────────────────
 const pricingRouter = router({
   list: protectedProcedure.query(() => getAllPricingRates()),
@@ -714,6 +751,7 @@ export const appRouter = router({
   scheduling: schedulingRouter,
   shifts: shiftsRouter,
   pricing: pricingRouter,
+  jobCosting: jobCostingRouter,
 });
 
 export type AppRouter = typeof appRouter;

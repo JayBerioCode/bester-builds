@@ -328,3 +328,21 @@ export const pricingRates = mysqlTable("pricing_rates", {
 });
 export type PricingRate = typeof pricingRates.$inferSelect;
 export type InsertPricingRate = typeof pricingRates.$inferInsert;
+
+// ─── Inventory Job Usage (actual materials consumed per order) ────────────────
+export const inventoryJobUsage = mysqlTable("inventory_job_usage", {
+  id: int("id").autoincrement().primaryKey(),
+  orderId: int("orderId").notNull(),
+  inventoryItemId: int("inventoryItemId").notNull(),
+  /** Quantity of inventory units consumed (e.g. metres, sheets, litres) */
+  quantityUsed: decimal("quantityUsed", { precision: 10, scale: 3 }).notNull(),
+  /** Unit cost at time of consumption (snapshot from inventory) */
+  unitCost: decimal("unitCost", { precision: 10, scale: 2 }).notNull(),
+  /** Total cost = quantityUsed × unitCost */
+  totalCost: decimal("totalCost", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  loggedAt: timestamp("loggedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type InventoryJobUsage = typeof inventoryJobUsage.$inferSelect;
+export type InsertInventoryJobUsage = typeof inventoryJobUsage.$inferInsert;

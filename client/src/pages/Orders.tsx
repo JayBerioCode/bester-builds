@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-import { Plus, ClipboardList, Search, Trash2, ChevronRight, FileText, Calculator, CheckCircle2, AlertCircle } from "lucide-react";
+import { Plus, ClipboardList, Search, Trash2, ChevronRight, FileText, Calculator, CheckCircle2, AlertCircle, PackagePlus } from "lucide-react";
 import { useLocation } from "wouter";
 
 const statusColors: Record<string, string> = {
@@ -406,6 +406,12 @@ export default function Orders() {
   const [editOrder, setEditOrder] = useState<any>(null);
   const [editOpen, setEditOpen] = useState(false);
   const [convertingOrderId, setConvertingOrderId] = useState<number | null>(null);
+  const [logMaterialsOrder, setLogMaterialsOrder] = useState<any>(null);
+  const [logMaterialsOpen, setLogMaterialsOpen] = useState(false);
+  const [logQty, setLogQty] = useState("");
+  const [logUnitCost, setLogUnitCost] = useState("");
+  const [logItemId, setLogItemId] = useState("none");
+  const [logNotes, setLogNotes] = useState("");
   const [, navigate] = useLocation();
 
   const utils = trpc.useUtils();
@@ -419,6 +425,16 @@ export default function Orders() {
   const updateOrder = trpc.orders.update.useMutation({
     onSuccess: () => { utils.orders.list.invalidate(); toast.success("Status updated"); },
   });
+  const { data: inventoryItems = [] } = trpc.inventory.listItems.useQuery({});
+  const logUsage = trpc.jobCosting.logUsage.useMutation({
+    onSuccess: () => {
+      toast.success("Material usage logged successfully!");
+      setLogMaterialsOpen(false);
+      setLogQty(""); setLogUnitCost(""); setLogItemId("none"); setLogNotes("");
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   const convertToInvoice = trpc.orders.convertToInvoice.useMutation({
     onSuccess: (invoice) => {
       utils.orders.list.invalidate();
@@ -564,6 +580,16 @@ export default function Orders() {
                         </Button>
                       )}
                       <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-xs gap-1"
+                        onClick={() => { setLogMaterialsOrder(order); setLogMaterialsOpen(true); }}
+                        title="Log materials used"
+                      >
+                        <PackagePlus className="h-3.5 w-3.5" />
+                        Materials
+                      </Button>
+                      <Button
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
@@ -579,6 +605,111 @@ export default function Orders() {
           })}
         </div>
       )}
+
+      {/* Log Materials Dialog */}
+      <Dialog open={logMaterialsOpen} onOpenChange={setLogMaterialsOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Log Material Usage</DialogTitle>
+          </DialogHeader>
+          {logMaterialsOrder && (
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Recording actual materials consumed for <span className="font-semibold text-foreground">{logMaterialsOrder.orderNumber} — {logMaterialsOrder.title}</span>
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-xs">Inventory Item *</Label>
+                  <Select value={logItemId} onValueChange={setLogItemId}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select material from inventory..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none" disabled>Select an item...</SelectItem>
+                      {inventoryItems.map((item: any) => (
+                        <SelectItem key={item.id} value={String(item.id)}>
+                          {item.name} ({item.unit}) — R {parseFloat(item.unitCost ?? "0").toFixed(2)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs">Quantity Used *</Label>
+                    <Input
+                      className="mt-1"
+                      type="number"
+                      step="0.001"
+                      min="0"
+                      placeholder="e.g. 2.5"
+                      value={logQty}
+                      onChange={(e) => {
+                        setLogQty(e.target.value);
+                        const item = inventoryItems.find((i: any) => String(i.id) === logItemId);
+                        if (item && e.target.value) {
+                          const total = parseFloat(e.target.value) * parseFloat(item.unitCost ?? "0");
+                          setLogUnitCost(parseFloat(item.unitCost ?? "0").toFixed(2));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs">Unit Cost (R) *</Label>
+                    <Input
+                      className="mt-1"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="e.g. 45.00"
+                      value={logUnitCost}
+                      onChange={(e) => setLogUnitCost(e.target.value)}
+                    />
+                  </div>
+                </div>
+                {logQty && logUnitCost && (
+                  <div className="rounded-lg bg-violet-50 border border-violet-200 p-3 text-sm">
+                    <span className="text-muted-foreground">Total Material Cost: </span>
+                    <span className="font-bold text-violet-700">
+                      R {(parseFloat(logQty) * parseFloat(logUnitCost)).toLocaleString("en-ZA", { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+                <div>
+                  <Label className="text-xs">Notes (optional)</Label>
+                  <Textarea
+                    className="mt-1 text-sm"
+                    rows={2}
+                    placeholder="e.g. 3m² PVC banner, includes waste"
+                    value={logNotes}
+                    onChange={(e) => setLogNotes(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-2">
+                <Button
+                  className="flex-1"
+                  disabled={!logItemId || logItemId === "none" || !logQty || !logUnitCost || logUsage.isPending}
+                  onClick={() => {
+                    const total = (parseFloat(logQty) * parseFloat(logUnitCost)).toFixed(2);
+                    logUsage.mutate({
+                      orderId: logMaterialsOrder.id,
+                      inventoryItemId: parseInt(logItemId),
+                      quantityUsed: parseFloat(logQty).toFixed(3),
+                      unitCost: parseFloat(logUnitCost).toFixed(2),
+                      totalCost: total,
+                      notes: logNotes || undefined,
+                    });
+                  }}
+                >
+                  {logUsage.isPending ? "Logging..." : "Log Usage"}
+                </Button>
+                <Button variant="outline" onClick={() => setLogMaterialsOpen(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

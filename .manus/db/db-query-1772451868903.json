@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `inventory_job_usage` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `orderId` int NOT NULL,\n  `inventoryItemId` int NOT NULL,\n  `quantityUsed` decimal(10,3) NOT NULL,\n  `unitCost` decimal(10,2) NOT NULL,\n  `totalCost` decimal(10,2) NOT NULL,\n  `notes` text,\n  `loggedAt` timestamp NOT NULL DEFAULT (now()),\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `inventory_job_usage_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user L5cn9KkH5feXQZL.6ddb75b4ae08 --database WwME9AmZKtjnw8sLvcXv7V --execute CREATE TABLE `inventory_job_usage` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `orderId` int NOT NULL,\n  `inventoryItemId` int NOT NULL,\n  `quantityUsed` decimal(10,3) NOT NULL,\n  `unitCost` decimal(10,2) NOT NULL,\n  `totalCost` decimal(10,2) NOT NULL,\n  `notes` text,\n  `loggedAt` timestamp NOT NULL DEFAULT (now()),\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `inventory_job_usage_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 265
+}

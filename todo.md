@@ -128,3 +128,14 @@
 - [x] Add PricingRates route (/settings/pricing) and sidebar nav entry under Settings
 - [x] Write vitest tests for pricing CRUD procedures
 - [x] Save checkpoint
+
+## Job Costing Report
+- [x] Add inventory_job_usage table to schema (orderId, inventoryItemId, quantityUsed, unitCost, totalCost)
+- [x] Generate and apply migration SQL
+- [x] Add DB helpers: logJobMaterialUsage, getJobCostingReport
+- [x] Add analytics.jobCosting tRPC procedure
+- [x] Add Job Costing section to Analytics page with per-job margin table
+- [x] Add "Log Materials Used" button on Orders page to record actual consumption
+- [x] Add profitability trend chart (quoted vs cost vs margin over time)
+- [x] Write vitest tests for jobCosting procedure
+- [x] Save checkpoint

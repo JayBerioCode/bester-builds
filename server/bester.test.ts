@@ -101,6 +101,11 @@ vi.mock("./db", () => ({
   getTimesheetExport: vi.fn().mockResolvedValue([
     { shiftId: 1, employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", department: "Production", hourlyRate: "75.00", clockIn: new Date("2026-03-01T08:00:00Z"), clockOut: new Date("2026-03-01T16:00:00Z"), hoursWorked: "8.00", earnings: "600.00", notes: null },
   ]),
+  logJobMaterialUsage: vi.fn().mockResolvedValue({ id: 1, orderId: 1, inventoryItemId: 1, quantityUsed: "2.500", unitCost: "45.00", totalCost: "112.50", notes: "3m² PVC banner", createdAt: new Date() }),
+  getJobCostingReport: vi.fn().mockResolvedValue([
+    { orderId: 1, orderNumber: "BB-001", title: "Banner Print", status: "in_production", customerId: 1, customerName: "Test Client", quotedTotal: 1150, actualCost: 450, grossMargin: 700, marginPct: 60.87, hasMaterialsLogged: true },
+    { orderId: 2, orderNumber: "BB-002", title: "Vinyl Wrap", status: "quote", customerId: 1, customerName: "Test Client", quotedTotal: 800, actualCost: 0, grossMargin: 0, marginPct: null, hasMaterialsLogged: false },
+  ]),
 }));
 
 // ─── Auth context factory ─────────────────────────────────────────────────────
@@ -782,5 +787,56 @@ describe("pricing", () => {
     const ctx = makeCtx("user");
     const caller = appRouter.createCaller(ctx);
     await expect(caller.pricing.delete({ id: 1 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});
+
+// ─── Job Costing Tests ────────────────────────────────────────────────────────
+describe("jobCosting.logUsage", () => {
+  it("logs material usage for an order", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.jobCosting.logUsage({
+      orderId: 1,
+      inventoryItemId: 1,
+      quantityUsed: "2.500",
+      unitCost: "45.00",
+      totalCost: "112.50",
+      notes: "3m² PVC banner",
+    });
+    expect(result).toMatchObject({ orderId: 1, inventoryItemId: 1 });
+  });
+
+  it("rejects logUsage for unauthenticated users", async () => {
+    const ctx = { ...makeCtx(), user: null };
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.jobCosting.logUsage({
+        orderId: 1,
+        inventoryItemId: 1,
+        quantityUsed: "2.500",
+        unitCost: "45.00",
+        totalCost: "112.50",
+      })
+    ).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+});
+
+describe("jobCosting.report", () => {
+  it("returns job costing report with margin data", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.jobCosting.report(undefined);
+    expect(Array.isArray(result)).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+    const costed = result.find((j) => j.hasMaterialsLogged);
+    expect(costed).toBeDefined();
+    expect(costed?.grossMargin).toBeGreaterThan(0);
+    expect(costed?.marginPct).not.toBeNull();
+  });
+
+  it("includes uncosted jobs with null marginPct", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.jobCosting.report(undefined);
+    const uncosted = result.find((j) => !j.hasMaterialsLogged);
+    expect(uncosted).toBeDefined();
+    expect(uncosted?.marginPct).toBeNull();
   });
 });

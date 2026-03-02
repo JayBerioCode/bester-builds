@@ -18,6 +18,7 @@ import {
   tasks,
   users,
   pricingRates,
+  inventoryJobUsage,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 
@@ -1065,4 +1066,108 @@ export async function getAllPricingRates() {
   const db = await getDb();
   if (!db) return [];
   return db.select().from(pricingRates).orderBy(pricingRates.printType, pricingRates.material);
+}
+
+// ─── Job Costing / Material Usage ────────────────────────────────────────────
+export async function logJobMaterialUsage(data: {
+  orderId: number;
+  inventoryItemId: number;
+  quantityUsed: string;
+  unitCost: string;
+  totalCost: string;
+  notes?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(inventoryJobUsage).values(data);
+}
+
+export async function getJobUsageByOrder(orderId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: inventoryJobUsage.id,
+      orderId: inventoryJobUsage.orderId,
+      inventoryItemId: inventoryJobUsage.inventoryItemId,
+      itemName: inventoryItems.name,
+      itemUnit: inventoryItems.unit,
+      quantityUsed: inventoryJobUsage.quantityUsed,
+      unitCost: inventoryJobUsage.unitCost,
+      totalCost: inventoryJobUsage.totalCost,
+      notes: inventoryJobUsage.notes,
+      loggedAt: inventoryJobUsage.loggedAt,
+    })
+    .from(inventoryJobUsage)
+    .leftJoin(inventoryItems, eq(inventoryJobUsage.inventoryItemId, inventoryItems.id))
+    .where(eq(inventoryJobUsage.orderId, orderId));
+  return rows;
+}
+
+export async function deleteJobUsageEntry(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(inventoryJobUsage).where(eq(inventoryJobUsage.id, id));
+}
+
+export async function getJobCostingReport(from?: Date, to?: Date) {
+  const db = await getDb();
+  if (!db) return [];
+
+  // Fetch all orders with their quoted total and customer name
+  const orderRows = await db
+    .select({
+      orderId: orders.id,
+      orderNumber: orders.orderNumber,
+      title: orders.title,
+      status: orders.status,
+      quotedTotal: orders.total,
+      customerId: orders.customerId,
+      customerName: customers.name,
+      createdAt: orders.createdAt,
+    })
+    .from(orders)
+    .leftJoin(customers, eq(orders.customerId, customers.id))
+    .orderBy(orders.createdAt);
+
+  // Fetch all job usage rows
+  const usageRows = await db
+    .select({
+      orderId: inventoryJobUsage.orderId,
+      totalCost: inventoryJobUsage.totalCost,
+    })
+    .from(inventoryJobUsage);
+
+  // Aggregate actual cost per order
+  const costByOrder: Record<number, number> = {};
+  for (const u of usageRows) {
+    costByOrder[u.orderId] = (costByOrder[u.orderId] ?? 0) + parseFloat(u.totalCost ?? "0");
+  }
+
+  // Filter by date range if provided
+  const filtered = orderRows.filter((o) => {
+    if (from && o.createdAt < from) return false;
+    if (to && o.createdAt > to) return false;
+    return true;
+  });
+
+  return filtered.map((o) => {
+    const quoted = parseFloat(o.quotedTotal ?? "0");
+    const actualCost = costByOrder[o.orderId] ?? 0;
+    const grossMargin = quoted - actualCost;
+    const marginPct = quoted > 0 ? (grossMargin / quoted) * 100 : null;
+    return {
+      orderId: o.orderId,
+      orderNumber: o.orderNumber,
+      title: o.title,
+      status: o.status,
+      customerName: o.customerName ?? "Unknown",
+      quotedTotal: quoted,
+      actualCost,
+      grossMargin,
+      marginPct: marginPct !== null ? parseFloat(marginPct.toFixed(1)) : null,
+      hasMaterialsLogged: actualCost > 0,
+      createdAt: o.createdAt,
+    };
+  });
 }
