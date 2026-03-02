@@ -25,6 +25,7 @@ import Signup from "./pages/Signup";
 import EmployeePortal from "./pages/EmployeePortal";
 import EmployeeAccess from "./pages/Settings/EmployeeAccess";
 import ShiftApproval from "./pages/ShiftApproval";
+import NotificationCentre from "./pages/NotificationCentre";
 
 function Router() {
   return (
@@ -56,6 +57,7 @@ function Router() {
             <Route path="/settings/company" component={CompanyProfile} />
             <Route path="/settings/employee-access" component={EmployeeAccess} />
             <Route path="/shifts/approval" component={ShiftApproval} />
+            <Route path="/notifications" component={NotificationCentre} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>

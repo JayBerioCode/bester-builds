@@ -1,0 +1,9 @@
+{
+  "query": "CREATE TABLE `employee_notifications` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `recipientId` int NOT NULL,\n  `recipientName` varchar(255),\n  `type` enum('shift_approved','shift_rejected','general') NOT NULL,\n  `title` varchar(255) NOT NULL,\n  `message` text NOT NULL,\n  `shiftId` int,\n  `isRead` boolean NOT NULL DEFAULT false,\n  `sentByName` varchar(255),\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `employee_notifications_id` PRIMARY KEY(`id`)\n);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user L5cn9KkH5feXQZL.6ddb75b4ae08 --database WwME9AmZKtjnw8sLvcXv7V --execute CREATE TABLE `employee_notifications` (\n  `id` int AUTO_INCREMENT NOT NULL,\n  `recipientId` int NOT NULL,\n  `recipientName` varchar(255),\n  `type` enum('shift_approved','shift_rejected','general') NOT NULL,\n  `title` varchar(255) NOT NULL,\n  `message` text NOT NULL,\n  `shiftId` int,\n  `isRead` boolean NOT NULL DEFAULT false,\n  `sentByName` varchar(255),\n  `createdAt` timestamp NOT NULL DEFAULT (now()),\n  CONSTRAINT `employee_notifications_id` PRIMARY KEY(`id`)\n);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 233
+}

@@ -424,3 +424,25 @@ export const companyProfile = mysqlTable("company_profile", {
 });
 export type CompanyProfile = typeof companyProfile.$inferSelect;
 export type InsertCompanyProfile = typeof companyProfile.$inferInsert;
+
+// ─── Employee Notifications ───────────────────────────────────────────────────
+export const employeeNotifications = mysqlTable("employee_notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  /** The local_users.id of the employee who receives this notification */
+  recipientId: int("recipientId").notNull(),
+  /** The employee's name (denormalised for fast display) */
+  recipientName: varchar("recipientName", { length: 255 }),
+  /** Notification category: shift_approved | shift_rejected | general */
+  type: mysqlEnum("type", ["shift_approved", "shift_rejected", "general"]).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  /** Optional link to the related shift log */
+  shiftId: int("shiftId"),
+  /** Whether the recipient has read this notification */
+  isRead: boolean("isRead").default(false).notNull(),
+  /** Who triggered this notification (admin name) */
+  sentByName: varchar("sentByName", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type EmployeeNotification = typeof employeeNotifications.$inferSelect;
+export type InsertEmployeeNotification = typeof employeeNotifications.$inferInsert;

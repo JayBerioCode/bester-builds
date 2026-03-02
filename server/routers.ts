@@ -100,6 +100,12 @@ import {
   rejectShift,
   bulkApproveShifts,
   countPendingShifts,
+  // Notifications
+  listNotificationsForUser,
+  countUnreadNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  listAllNotifications,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -1121,6 +1127,59 @@ const allowlistRouter = router({
     }),
 });
 
+// ─── Notifications Router ────────────────────────────────────────────────────
+const notificationsRouter = router({
+  /** List notifications for the calling local-auth user. */
+  list: publicProcedure
+    .input(z.object({ limit: z.number().optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return listNotificationsForUser(session.localUserId, input?.limit);
+    }),
+
+  /** Count unread notifications for the calling user. */
+  countUnread: publicProcedure
+    .query(async ({ ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) return 0;
+      return countUnreadNotifications(session.localUserId);
+    }),
+
+  /** Mark a single notification as read. */
+  markRead: publicProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await markNotificationRead(input.id, session.localUserId);
+      return { success: true };
+    }),
+
+  /** Mark all notifications as read for the calling user. */
+  markAllRead: publicProcedure
+    .mutation(async ({ ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session) throw new TRPCError({ code: "UNAUTHORIZED" });
+      await markAllNotificationsRead(session.localUserId);
+      return { success: true };
+    }),
+
+  /** List all notifications across all employees (admin only). */
+  listAll: publicProcedure
+    .input(z.object({ limit: z.number().optional() }).optional())
+    .query(async ({ input, ctx }) => {
+      const token = ctx.req.cookies?.[LOCAL_AUTH_COOKIE];
+      const session = await verifyLocalSession(token);
+      if (!session || session.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return listAllNotifications(input?.limit);
+    }),
+});
+
 // ─── App Router ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -1149,6 +1208,7 @@ export const appRouter = router({
   localAuth: localAuthRouter,
   allowlist: allowlistRouter,
   employeePortal: employeePortalRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

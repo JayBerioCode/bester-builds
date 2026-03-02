@@ -1477,7 +1477,7 @@ export async function listShiftsForApproval(opts?: {
   return rows;
 }
 
-/** Approve a single shift log. */
+/** Approve a single shift log and notify the employee. */
 export async function approveShift(
   shiftId: number,
   approvedById: number,
@@ -1495,9 +1495,26 @@ export async function approveShift(
       rejectionReason: null,
     })
     .where(eq(shiftLogs.id, shiftId));
+  // Notify the employee
+  const [shift] = await db.select().from(shiftLogs).where(eq(shiftLogs.id, shiftId)).limit(1);
+  if (shift) {
+    const recipient = await findLocalUserByEmployeeId(shift.employeeId);
+    if (recipient) {
+      const clockInDate = new Date(shift.clockIn).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" });
+      await createNotification({
+        recipientId: recipient.id,
+        recipientName: recipient.name,
+        type: "shift_approved",
+        title: "Shift Approved",
+        message: `Your shift on ${clockInDate} has been approved by ${approvedByName}.`,
+        shiftId,
+        sentByName: approvedByName,
+      });
+    }
+  }
 }
 
-/** Reject a single shift log with an optional reason. */
+/** Reject a single shift log with an optional reason and notify the employee. */
 export async function rejectShift(
   shiftId: number,
   approvedById: number,
@@ -1516,9 +1533,27 @@ export async function rejectShift(
       rejectionReason: reason ?? null,
     })
     .where(eq(shiftLogs.id, shiftId));
+  // Notify the employee
+  const [shift] = await db.select().from(shiftLogs).where(eq(shiftLogs.id, shiftId)).limit(1);
+  if (shift) {
+    const recipient = await findLocalUserByEmployeeId(shift.employeeId);
+    if (recipient) {
+      const clockInDate = new Date(shift.clockIn).toLocaleDateString("en-ZA", { day: "2-digit", month: "short", year: "numeric" });
+      const reasonText = reason ? ` Reason: ${reason}` : "";
+      await createNotification({
+        recipientId: recipient.id,
+        recipientName: recipient.name,
+        type: "shift_rejected",
+        title: "Shift Rejected",
+        message: `Your shift on ${clockInDate} was rejected by ${approvedByName}.${reasonText} Please contact your manager if you have questions.`,
+        shiftId,
+        sentByName: approvedByName,
+      });
+    }
+  }
 }
 
-/** Bulk-approve multiple shifts at once. */
+/** Bulk-approve multiple shifts at once and notify each employee. */
 export async function bulkApproveShifts(
   shiftIds: number[],
   approvedById: number,
@@ -1536,7 +1571,29 @@ export async function bulkApproveShifts(
       approvedAt: new Date(),
       rejectionReason: null,
     })
+    .where(sql`${shiftLogs.id} IN (${sql.join(shiftIds.map((id) => sql`${id}`), sql`, `)})`);  // Notify each affected employee (deduplicated by employee)
+  const updatedShifts = await db
+    .select()
+    .from(shiftLogs)
     .where(sql`${shiftLogs.id} IN (${sql.join(shiftIds.map((id) => sql`${id}`), sql`, `)})`);
+  const seenEmployees = new Set<number>();
+  for (const shift of updatedShifts) {
+    if (seenEmployees.has(shift.employeeId)) continue;
+    seenEmployees.add(shift.employeeId);
+    const recipient = await findLocalUserByEmployeeId(shift.employeeId);
+    if (recipient) {
+      const count = updatedShifts.filter((s) => s.employeeId === shift.employeeId).length;
+      const label = count === 1 ? "1 shift" : `${count} shifts`;
+      await createNotification({
+        recipientId: recipient.id,
+        recipientName: recipient.name,
+        type: "shift_approved",
+        title: "Shifts Approved",
+        message: `${label} have been approved by ${approvedByName}.`,
+        sentByName: approvedByName,
+      });
+    }
+  }
 }
 
 /** Count pending shifts (for badge/notification). */
@@ -1553,4 +1610,117 @@ export async function countPendingShifts(): Promise<number> {
       )
     );
   return Number(row?.count ?? 0);
+}
+
+// ─── Employee Notifications ───────────────────────────────────────────────────
+import {
+  employeeNotifications,
+  type EmployeeNotification,
+} from "../drizzle/schema";
+
+/** Create a new notification for an employee. */
+export async function createNotification(data: {
+  recipientId: number;
+  recipientName?: string;
+  type: "shift_approved" | "shift_rejected" | "general";
+  title: string;
+  message: string;
+  shiftId?: number;
+  sentByName?: string;
+}): Promise<EmployeeNotification> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .insert(employeeNotifications)
+    .values({
+      recipientId: data.recipientId,
+      recipientName: data.recipientName,
+      type: data.type,
+      title: data.title,
+      message: data.message,
+      shiftId: data.shiftId,
+      sentByName: data.sentByName,
+      isRead: false,
+    })
+    .$returningId();
+  return { ...data, id: row.id, isRead: false, createdAt: new Date() } as EmployeeNotification;
+}
+
+/** List notifications for a specific recipient, newest first. */
+export async function listNotificationsForUser(
+  recipientId: number,
+  limit = 50
+): Promise<EmployeeNotification[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(employeeNotifications)
+    .where(eq(employeeNotifications.recipientId, recipientId))
+    .orderBy(desc(employeeNotifications.createdAt))
+    .limit(limit);
+}
+
+/** Count unread notifications for a recipient. */
+export async function countUnreadNotifications(recipientId: number): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const [row] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(employeeNotifications)
+    .where(
+      and(
+        eq(employeeNotifications.recipientId, recipientId),
+        eq(employeeNotifications.isRead, false)
+      )
+    );
+  return Number(row?.count ?? 0);
+}
+
+/** Mark a single notification as read. */
+export async function markNotificationRead(id: number, recipientId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(employeeNotifications)
+    .set({ isRead: true })
+    .where(
+      and(
+        eq(employeeNotifications.id, id),
+        eq(employeeNotifications.recipientId, recipientId)
+      )
+    );
+}
+
+/** Mark all notifications as read for a recipient. */
+export async function markAllNotificationsRead(recipientId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(employeeNotifications)
+    .set({ isRead: true })
+    .where(eq(employeeNotifications.recipientId, recipientId));
+}
+
+/** List all notifications across all employees (admin view), newest first. */
+export async function listAllNotifications(limit = 200): Promise<EmployeeNotification[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(employeeNotifications)
+    .orderBy(desc(employeeNotifications.createdAt))
+    .limit(limit);
+}
+
+/** Find the local_users account linked to a given employees.id (for notification targeting). */
+export async function findLocalUserByEmployeeId(employeeId: number): Promise<LocalUser | null> {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db
+    .select()
+    .from(localUsers)
+    .where(eq(localUsers.employeeId, employeeId))
+    .limit(1);
+  return rows[0] ?? null;
 }

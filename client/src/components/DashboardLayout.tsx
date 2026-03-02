@@ -45,6 +45,7 @@ import {
   UserCog,
   LogIn,
   ClipboardCheck,
+  BellRing,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -83,6 +84,7 @@ const menuGroups = [
       { icon: Clock, label: "Clock In/Out", path: "/clock-in" },
       { icon: Monitor, label: "PIN Kiosk", path: "/kiosk" },
       { icon: ClipboardCheck, label: "Shift Approval", path: "/shifts/approval" },
+      { icon: BellRing, label: "Notifications", path: "/notifications" },
     ],
   },
   {

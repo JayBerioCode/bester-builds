@@ -193,3 +193,15 @@
 - [x] Add Shift Approval sidebar nav link (Team group)
 - [x] Write vitest tests for approval procedures
 - [x] Save checkpoint
+
+## Automated Shift Notification System
+- [x] Audit schema and plan notifications table (recipientId, type, title, message, shiftId, isRead, createdAt)
+- [x] Generate and apply migration SQL for notifications table
+- [x] Add DB helpers: createNotification, listNotificationsForUser, markNotificationRead, markAllRead, countUnread
+- [x] Trigger notification on approveShift and rejectShift in DB helpers
+- [x] Add tRPC procedures: notifications.list, notifications.countUnread, notifications.markRead, notifications.markAllRead
+- [x] Build notification bell with unread badge in Employee Portal header
+- [x] Build notification dropdown/panel showing recent notifications
+- [x] Add notification centre page in admin sidebar (Team group)
+- [x] Write vitest tests for notification procedures
+- [x] Save checkpoint

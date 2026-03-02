@@ -25,6 +25,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { format } from "date-fns";
+import { NotificationBell } from "@/components/NotificationBell";
 
 function useLiveTimer(clockInTime: number | null) {
   const [elapsed, setElapsed] = useState(0);
@@ -138,6 +139,7 @@ export default function EmployeePortal() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <NotificationBell />
             <div className="text-right">
               <p className="text-sm font-medium text-foreground">{user?.name}</p>
               <p className="text-xs text-muted-foreground capitalize">
