@@ -117,3 +117,14 @@
 - [x] Auto-populate subtotal, line items, and total fields from calculator output
 - [x] Write vitest tests for calculateCost procedure
 - [x] Save checkpoint
+
+## Pricing Rates Settings Page
+- [x] Add DB helpers: createPricingRate, updatePricingRate, deletePricingRate
+- [x] Add tRPC procedures: pricing.list, pricing.create, pricing.update, pricing.delete (admin-only)
+- [x] Build PricingRates settings page with grouped table by print type
+- [x] Add inline edit dialog per rate (all fields editable)
+- [x] Add "New Rate" form with all fields
+- [x] Add toggle to activate/deactivate a rate
+- [x] Add PricingRates route (/settings/pricing) and sidebar nav entry under Settings
+- [x] Write vitest tests for pricing CRUD procedures
+- [x] Save checkpoint

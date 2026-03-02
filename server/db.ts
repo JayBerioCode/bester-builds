@@ -1010,3 +1010,59 @@ export async function calculatePrintCost(input: {
     },
   };
 }
+
+// ─── Pricing Rate CRUD ────────────────────────────────────────────────────────
+export async function createPricingRate(data: {
+  printType: string;
+  material: string;
+  ratePerSqm: string;
+  setupFee: string;
+  minCharge: string;
+  laminationRatePerSqm?: string;
+  eyeletRatePerMetre?: string;
+}) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(pricingRates).values({
+    printType: data.printType as any,
+    material: data.material,
+    ratePerSqm: data.ratePerSqm,
+    setupFee: data.setupFee,
+    minCharge: data.minCharge,
+    laminationRatePerSqm: data.laminationRatePerSqm ?? "0.00",
+    eyeletRatePerMetre: data.eyeletRatePerMetre ?? "0.00",
+    isActive: true,
+  });
+}
+
+export async function updatePricingRate(
+  id: number,
+  data: Partial<{
+    printType: string;
+    material: string;
+    ratePerSqm: string;
+    setupFee: string;
+    minCharge: string;
+    laminationRatePerSqm: string;
+    eyeletRatePerMetre: string;
+    isActive: boolean;
+  }>
+) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const updateData: Record<string, unknown> = { ...data };
+  if (data.printType) updateData.printType = data.printType as any;
+  await db.update(pricingRates).set(updateData).where(eq(pricingRates.id, id));
+}
+
+export async function deletePricingRate(id: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.delete(pricingRates).where(eq(pricingRates.id, id));
+}
+
+export async function getAllPricingRates() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(pricingRates).orderBy(pricingRates.printType, pricingRates.material);
+}

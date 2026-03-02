@@ -40,6 +40,7 @@ import {
   Users2,
   FileText,
   CheckSquare,
+  Tag,
 } from "lucide-react";
 import { CSSProperties, useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
@@ -77,6 +78,12 @@ const menuGroups = [
       { icon: Users2, label: "Employees", path: "/employees" },
       { icon: Clock, label: "Clock In/Out", path: "/clock-in" },
       { icon: Monitor, label: "PIN Kiosk", path: "/kiosk" },
+    ],
+  },
+  {
+    label: "Settings",
+    items: [
+      { icon: Tag, label: "Pricing Rates", path: "/settings/pricing" },
     ],
   },
 ];

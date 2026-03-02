@@ -17,6 +17,7 @@ import Analytics from "./pages/Analytics";
 import Scheduling from "./pages/Scheduling";
 import ClockIn from "./pages/ClockIn";
 import PinKiosk from "./pages/PinKiosk";
+import PricingRates from "./pages/PricingRates";
 
 function Router() {
   return (
@@ -38,6 +39,7 @@ function Router() {
             <Route path="/analytics" component={Analytics} />
             <Route path="/scheduling" component={Scheduling} />
             <Route path="/clock-in" component={ClockIn} />
+            <Route path="/settings/pricing" component={PricingRates} />
             <Route path="/404" component={NotFound} />
             <Route component={NotFound} />
           </Switch>

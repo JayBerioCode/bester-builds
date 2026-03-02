@@ -69,6 +69,12 @@ vi.mock("./db", () => ({
   hashPin: vi.fn().mockResolvedValue("$2b$10$hashedpin"),
   createInvoiceFromOrder: vi.fn().mockResolvedValue({ id: 99, invoiceNumber: "INV-999999", orderId: 1, customerId: 1, status: "draft", subtotal: "1000.00", taxRate: "15", taxAmount: "150.00", discountAmount: "0.00", total: "1150.00", amountPaid: "0.00", amountDue: "1150.00", issueDate: new Date(), dueDate: new Date(Date.now() + 30*24*60*60*1000), notes: null, terms: null, createdAt: new Date(), updatedAt: new Date() }),
   getOrderWithItemsForInvoice: vi.fn().mockResolvedValue({ order: { id: 1, orderNumber: "BB-001", title: "Test Banner", customerId: 1, status: "quote", subtotal: "1000.00", taxRate: "0", taxAmount: "0", discountAmount: "0", total: "1000.00" }, customer: { id: 1, name: "Test Client" }, items: [] }),
+  getAllPricingRates: vi.fn().mockResolvedValue([
+    { id: 1, printType: "banner", material: "PVC 440gsm", ratePerSqm: "85.00", setupFee: "150.00", minCharge: "250.00", laminationRatePerSqm: "35.00", eyeletRatePerMetre: "12.00", isActive: true, createdAt: new Date(), updatedAt: new Date() },
+  ]),
+  createPricingRate: vi.fn().mockResolvedValue(undefined),
+  updatePricingRate: vi.fn().mockResolvedValue(undefined),
+  deletePricingRate: vi.fn().mockResolvedValue(undefined),
   getPricingRates: vi.fn().mockResolvedValue([
     { id: 1, printType: "banner", material: "PVC 440gsm", ratePerSqm: "85.00", setupFee: "150.00", minCharge: "250.00", laminationRatePerSqm: "35.00", eyeletRatePerMetre: "12.00", isActive: true, createdAt: new Date(), updatedAt: new Date() },
   ]),
@@ -714,5 +720,67 @@ describe("orders.calculateCost", () => {
     const caller = appRouter.createCaller(ctx);
     const rates = await caller.orders.getPricingRates({ printType: "banner" });
     expect(Array.isArray(rates)).toBe(true);
+  });
+});
+
+// ─── Pricing CRUD Tests ───────────────────────────────────────────────────────
+describe("pricing", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("lists all pricing rates", async () => {
+    const ctx = makeCtx();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.pricing.list();
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("creates a new pricing rate (admin only)", async () => {
+    const ctx = makeCtx("admin");
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.pricing.create({
+        printType: "banner",
+        material: "PVC 510gsm",
+        ratePerSqm: "95.00",
+        setupFee: "200.00",
+        minCharge: "300.00",
+        laminationRatePerSqm: "40.00",
+        eyeletRatePerMetre: "15.00",
+      })
+    ).resolves.not.toThrow();
+  });
+
+  it("rejects rate creation for non-admin users", async () => {
+    const ctx = makeCtx("user");
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.pricing.create({
+        printType: "banner",
+        material: "Cheap Vinyl",
+        ratePerSqm: "50.00",
+        setupFee: "100.00",
+        minCharge: "150.00",
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("updates a pricing rate (admin only)", async () => {
+    const ctx = makeCtx("admin");
+    const caller = appRouter.createCaller(ctx);
+    await expect(
+      caller.pricing.update({ id: 1, ratePerSqm: "90.00", isActive: true })
+    ).resolves.not.toThrow();
+  });
+
+  it("deletes a pricing rate (admin only)", async () => {
+    const ctx = makeCtx("admin");
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.pricing.delete({ id: 1 })).resolves.not.toThrow();
+  });
+
+  it("rejects rate deletion for non-admin users", async () => {
+    const ctx = makeCtx("user");
+    const caller = appRouter.createCaller(ctx);
+    await expect(caller.pricing.delete({ id: 1 })).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 });

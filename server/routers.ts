@@ -2,6 +2,7 @@ import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, publicProcedure, router } from "./_core/trpc";
 import {
   createAppointment,
@@ -66,6 +67,10 @@ import {
   getOrderWithItemsForInvoice,
   getPricingRates,
   calculatePrintCost,
+  getAllPricingRates,
+  createPricingRate,
+  updatePricingRate,
+  deletePricingRate,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -638,6 +643,55 @@ const shiftsRouter = router({
     .query(({ input }) => getTimesheetExport(input.from, input.to, input.employeeId)),
 });
 
+// ─── Pricing Router ─────────────────────────────────────────────────────────
+const pricingRouter = router({
+  list: protectedProcedure.query(() => getAllPricingRates()),
+
+  create: protectedProcedure
+    .input(
+      z.object({
+        printType: z.string().min(1),
+        material: z.string().min(1),
+        ratePerSqm: z.string(),
+        setupFee: z.string(),
+        minCharge: z.string(),
+        laminationRatePerSqm: z.string().optional(),
+        eyeletRatePerMetre: z.string().optional(),
+      })
+    )
+    .mutation(({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return createPricingRate(input);
+    }),
+
+  update: protectedProcedure
+    .input(
+      z.object({
+        id: z.number(),
+        printType: z.string().optional(),
+        material: z.string().optional(),
+        ratePerSqm: z.string().optional(),
+        setupFee: z.string().optional(),
+        minCharge: z.string().optional(),
+        laminationRatePerSqm: z.string().optional(),
+        eyeletRatePerMetre: z.string().optional(),
+        isActive: z.boolean().optional(),
+      })
+    )
+    .mutation(({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      const { id, ...data } = input;
+      return updatePricingRate(id, data);
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(({ ctx, input }) => {
+      if (ctx.user?.role !== "admin") throw new TRPCError({ code: "FORBIDDEN" });
+      return deletePricingRate(input.id);
+    }),
+});
+
 // ─── App Router ──────────────────────────────────────────────────────────────
 export const appRouter = router({
   system: systemRouter,
@@ -659,6 +713,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   scheduling: schedulingRouter,
   shifts: shiftsRouter,
+  pricing: pricingRouter,
 });
 
 export type AppRouter = typeof appRouter;
