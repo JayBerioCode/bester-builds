@@ -454,10 +454,10 @@ export const jobCards = mysqlTable("job_cards", {
   id: int("id").autoincrement().primaryKey(),
   /** Job card number e.g. JC-0001 */
   jobCardNumber: varchar("jobCardNumber", { length: 50 }).notNull().unique(),
-  /** The invoice this job card was generated from */
-  invoiceId: int("invoiceId").notNull(),
-  /** Purchase order number from the invoice */
-  poNumber: varchar("poNumber", { length: 100 }).notNull(),
+  /** The invoice this job card was generated from (null for manually created cards) */
+  invoiceId: int("invoiceId"),
+  /** Purchase order number from the invoice (optional for manual cards) */
+  poNumber: varchar("poNumber", { length: 100 }),
   /** Short title for the job */
   jobTitle: varchar("jobTitle", { length: 255 }).notNull(),
   /** Customer name (denormalised for quick display) */

@@ -1252,6 +1252,48 @@ const jobCardsRouter = router({
         status: "pending",
       });
     }),
+  /** Create a manual job card (no invoice required). */
+  createManual: protectedProcedure
+    .input(z.object({
+      jobTitle: z.string().min(1),
+      customerName: z.string().optional(),
+      poNumber: z.string().optional(),
+      assignedTo: z.number().optional(),
+      assignedToName: z.string().optional(),
+      dueDate: z.string().optional(),
+      printType: z.string().optional(),
+      width: z.string().optional(),
+      height: z.string().optional(),
+      dimensionUnit: z.string().optional(),
+      quantity: z.number().optional(),
+      material: z.string().optional(),
+      finishing: z.string().optional(),
+      instructions: z.string().optional(),
+      notes: z.string().optional(),
+      fileUrl: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      return createJobCard({
+        invoiceId: null,
+        poNumber: input.poNumber ?? null,
+        jobTitle: input.jobTitle,
+        customerName: input.customerName ?? null,
+        assignedTo: input.assignedTo ?? null,
+        assignedToName: input.assignedToName ?? null,
+        dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        printType: input.printType ?? null,
+        width: input.width ?? null,
+        height: input.height ?? null,
+        dimensionUnit: input.dimensionUnit ?? "m",
+        quantity: input.quantity ?? 1,
+        material: input.material ?? null,
+        finishing: input.finishing ?? null,
+        instructions: input.instructions ?? null,
+        notes: input.notes ?? null,
+        fileUrl: input.fileUrl ?? null,
+        status: "pending",
+      });
+    }),
 
   /** Update a job card's status or fields. */
   update: protectedProcedure

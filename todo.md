@@ -252,3 +252,13 @@
 - [x] Fix localAuth.listUsers, setActive, setRole to also accept ctx.user?.role === 'admin'
 - [x] Fix shifts.approve, shifts.reject, shifts.bulkApprove to also accept ctx.user?.role === 'admin'
 - [x] Save checkpoint
+
+## Manual Job Card Creation
+- [x] Make invoiceId and poNumber nullable in job_cards schema (allow NULL)
+- [x] Generate and apply migration SQL
+- [x] Update createJobCard DB helper to accept optional invoiceId/poNumber
+- [x] Add jobCards.createManual tRPC procedure (no invoice required)
+- [x] Add "Manual" button to Job Cards page header (alongside "From Invoice" button)
+- [x] Build ManualJobCardDialog with all fields (title, customer, PO, assignee, due date, print specs, instructions, notes, file URL)
+- [x] Manual job cards appear in list and kanban board alongside invoice-linked ones
+- [x] Save checkpoint

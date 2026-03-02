@@ -408,9 +408,166 @@ function UpdateStatusDialog({ jobCard, open, onClose }: { jobCard: any; open: bo
   );
 }
 
+// ─── Manual Job Card Dialog ──────────────────────────────────────────────────
+function ManualJobCardDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const utils = trpc.useUtils();
+  const [form, setForm] = useState({
+    jobTitle: "",
+    customerName: "",
+    poNumber: "",
+    assignedToName: "",
+    dueDate: "",
+    printType: "",
+    width: "",
+    height: "",
+    dimensionUnit: "m",
+    quantity: "1",
+    material: "",
+    finishing: "",
+    instructions: "",
+    notes: "",
+    fileUrl: "",
+  });
+  const createMutation = trpc.jobCards.createManual.useMutation({
+    onSuccess: () => {
+      utils.jobCards.list.invalidate();
+      toast.success("Job card created successfully!");
+      handleClose();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+  const handleClose = () => {
+    setForm({
+      jobTitle: "", customerName: "", poNumber: "", assignedToName: "",
+      dueDate: "", printType: "", width: "", height: "", dimensionUnit: "m",
+      quantity: "1", material: "", finishing: "", instructions: "", notes: "", fileUrl: "",
+    });
+    onClose();
+  };
+  const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
+  return (
+    <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-purple-500" />
+            Create Manual Job Card
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2 space-y-1.5">
+              <Label>Job Title <span className="text-red-500">*</span></Label>
+              <Input placeholder="e.g. Banner print for ABC Corp" value={form.jobTitle} onChange={(e) => set("jobTitle", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Customer Name</Label>
+              <Input placeholder="Client or company name" value={form.customerName} onChange={(e) => set("customerName", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>PO Number</Label>
+              <Input placeholder="Optional purchase order #" value={form.poNumber} onChange={(e) => set("poNumber", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Assigned To</Label>
+              <Input placeholder="Staff member name" value={form.assignedToName} onChange={(e) => set("assignedToName", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Due Date</Label>
+              <Input type="date" value={form.dueDate} onChange={(e) => set("dueDate", e.target.value)} />
+            </div>
+          </div>
+          <div className="border-t pt-4">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Print Specifications</p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Print Type</Label>
+                <Input placeholder="e.g. Vinyl Banner, Mesh" value={form.printType} onChange={(e) => set("printType", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Quantity</Label>
+                <Input type="number" min="1" value={form.quantity} onChange={(e) => set("quantity", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Width</Label>
+                <Input placeholder="e.g. 3" value={form.width} onChange={(e) => set("width", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Height</Label>
+                <Input placeholder="e.g. 1.5" value={form.height} onChange={(e) => set("height", e.target.value)} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Unit</Label>
+                <Select value={form.dimensionUnit} onValueChange={(v) => set("dimensionUnit", v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="m">m</SelectItem>
+                    <SelectItem value="cm">cm</SelectItem>
+                    <SelectItem value="mm">mm</SelectItem>
+                    <SelectItem value="ft">ft</SelectItem>
+                    <SelectItem value="in">in</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Material</Label>
+                <Input placeholder="e.g. 440gsm PVC" value={form.material} onChange={(e) => set("material", e.target.value)} />
+              </div>
+              <div className="col-span-2 space-y-1.5">
+                <Label>Finishing</Label>
+                <Input placeholder="e.g. Hemmed & eyeleted" value={form.finishing} onChange={(e) => set("finishing", e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <div className="border-t pt-4 space-y-4">
+            <div className="space-y-1.5">
+              <Label>Production Instructions</Label>
+              <Textarea rows={3} placeholder="Special instructions for the production team…" value={form.instructions} onChange={(e) => set("instructions", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Internal Notes</Label>
+              <Textarea rows={2} placeholder="Internal notes (not printed on job card)…" value={form.notes} onChange={(e) => set("notes", e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Artwork File URL</Label>
+              <Input placeholder="https://…" value={form.fileUrl} onChange={(e) => set("fileUrl", e.target.value)} />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={handleClose}>Cancel</Button>
+          <Button
+            onClick={() => createMutation.mutate({
+              jobTitle: form.jobTitle,
+              customerName: form.customerName || undefined,
+              poNumber: form.poNumber || undefined,
+              assignedToName: form.assignedToName || undefined,
+              dueDate: form.dueDate || undefined,
+              printType: form.printType || undefined,
+              width: form.width || undefined,
+              height: form.height || undefined,
+              dimensionUnit: form.dimensionUnit || undefined,
+              quantity: parseInt(form.quantity) || 1,
+              material: form.material || undefined,
+              finishing: form.finishing || undefined,
+              instructions: form.instructions || undefined,
+              notes: form.notes || undefined,
+              fileUrl: form.fileUrl || undefined,
+            })}
+            disabled={!form.jobTitle.trim() || createMutation.isPending}
+            className="bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            {createMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Job Card"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function JobCardGenerator() {
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
   const [preselectedInvoiceId, setPreselectedInvoiceId] = useState<number | undefined>();
   const [updateTarget, setUpdateTarget] = useState<any>(null);
   const [search, setSearch] = useState("");
@@ -525,11 +682,19 @@ export default function JobCardGenerator() {
             </button>
           </div>
           <Button
+            variant="outline"
+            onClick={() => setManualOpen(true)}
+            className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
+          >
+            <Plus className="w-4 h-4" />
+            Manual
+          </Button>
+          <Button
             onClick={() => setGenerateOpen(true)}
             className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
           >
-            <Plus className="w-4 h-4" />
-            New Job Card
+            <FileText className="w-4 h-4" />
+            From Invoice
           </Button>
         </div>
       </div>
@@ -713,6 +878,7 @@ export default function JobCardGenerator() {
       )}
 
       {/* Dialogs */}
+      <ManualJobCardDialog open={manualOpen} onClose={() => setManualOpen(false)} />
       <GenerateDialog open={generateOpen} onClose={() => { setGenerateOpen(false); setPreselectedInvoiceId(undefined); }} preselectedInvoiceId={preselectedInvoiceId} />
       {updateTarget && (
         <UpdateStatusDialog

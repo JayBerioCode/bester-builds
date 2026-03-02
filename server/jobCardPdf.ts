@@ -23,7 +23,7 @@ export interface JobCardData {
   jobCard: {
     jobCardNumber: string;
     jobTitle: string;
-    poNumber: string;
+    poNumber: string | null;
     status: string;
     printType?: string | null;
     width?: string | number | null;
@@ -35,20 +35,21 @@ export interface JobCardData {
     instructions?: string | null;
     notes?: string | null;
     fileUrl?: string | null;
+    customerName?: string | null;
     assignedToName?: string | null;
     dueDate?: Date | string | null;
     createdAt: Date | string;
   };
-  invoice: {
+  invoice?: {
     invoiceNumber: string;
     total: string | number;
-  };
-  customer: {
+  } | null;
+  customer?: {
     name: string;
     company?: string | null;
     email?: string | null;
     phone?: string | null;
-  };
+  } | null;
   company?: {
     companyName?: string | null;
     phone?: string | null;
@@ -91,6 +92,8 @@ function labelValue(
 // ─── Main Generator ───────────────────────────────────────────────────────────
 export function generateJobCardPDF(data: JobCardData, res: Response): void {
   const { jobCard, invoice, customer, company } = data;
+  const safeInvoice = invoice ?? { invoiceNumber: "—", total: "—" };
+  const safeCustomer = customer ?? { name: jobCard.customerName ?? "—" };
 
   const doc = new PDFDocument({
     size: "A4",
@@ -186,8 +189,8 @@ export function generateJobCardPDF(data: JobCardData, res: Response): void {
 
   // Left column: job details
   const leftRows: [string, string][] = [
-    ["PO Number", jobCard.poNumber],
-    ["Invoice", invoice.invoiceNumber],
+    ["PO Number", jobCard.poNumber ?? "—"],
+    ["Invoice", safeInvoice.invoiceNumber],
     ["Assigned To", jobCard.assignedToName ?? "Unassigned"],
     ["Due Date", fmtDate(jobCard.dueDate)],
   ];
@@ -199,10 +202,10 @@ export function generateJobCardPDF(data: JobCardData, res: Response): void {
 
   // Right column: customer
   const rightRows: [string, string][] = [
-    ["Name", customer.name],
-    ["Company", customer.company ?? "—"],
-    ["Email", customer.email ?? "—"],
-    ["Phone", customer.phone ?? "—"],
+    ["Name", safeCustomer.name],
+    ["Company", (safeCustomer as { company?: string | null }).company ?? "—"],
+    ["Email", (safeCustomer as { email?: string | null }).email ?? "—"],
+    ["Phone", (safeCustomer as { phone?: string | null }).phone ?? "—"],
   ];
   rightRows.forEach(([label, value], i) => {
     const rowY = y + i * rowH;
