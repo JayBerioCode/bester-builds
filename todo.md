@@ -225,3 +225,10 @@
 - [x] Wire poNumber to invoices.create and invoices.update tRPC mutations
 - [x] Show PO Number badge in invoice list (purple, with hash icon)
 - [x] Save checkpoint
+
+## Create Job Card Button on Invoices
+- [x] Add "Create Job Card" button to invoice list rows that have a poNumber
+- [x] Navigate to /job-cards?invoiceId=X on click to pre-select the invoice
+- [x] Auto-open the creation dialog in JobCardGenerator when invoiceId query param is present
+- [x] Pre-fill the job card form with data from the pre-selected invoice
+- [x] Save checkpoint

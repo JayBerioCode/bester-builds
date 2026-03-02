@@ -9,7 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, FileText, Search, Download, Hash } from "lucide-react";
+import { Plus, FileText, Search, Download, Hash, ClipboardList } from "lucide-react";
+import { useLocation } from "wouter";
 
 const statusColors: Record<string, string> = {
   draft: "bg-gray-100 text-gray-600",
@@ -139,6 +140,7 @@ export default function Invoices() {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [, navigate] = useLocation();
 
   const utils = trpc.useUtils();
   const { data: invoices = [], isLoading } = trpc.invoices.list.useQuery({
@@ -257,6 +259,18 @@ export default function Invoices() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    {(inv as any).poNumber && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 text-xs gap-1 bg-background text-purple-600 border-purple-200 hover:bg-purple-50 hover:text-purple-700"
+                        onClick={() => navigate(`/job-cards?invoiceId=${inv.id}`)}
+                        title={`Create job card for PO ${(inv as any).poNumber}`}
+                      >
+                        <ClipboardList className="h-3.5 w-3.5" />
+                        Job Card
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"

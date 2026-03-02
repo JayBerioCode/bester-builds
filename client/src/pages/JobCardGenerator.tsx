@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,12 +71,20 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 // ─── Generate Dialog ──────────────────────────────────────────────────────────
-function GenerateDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+function GenerateDialog({ open, onClose, preselectedInvoiceId }: { open: boolean; onClose: () => void; preselectedInvoiceId?: number }) {
   const utils = trpc.useUtils();
   const { data: invoices = [], isLoading: loadingInvoices } = trpc.jobCards.listInvoicesWithPO.useQuery(undefined, { enabled: open });
-
   const [step, setStep] = useState<"pick" | "form">("pick");
   const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+
+  // Auto-select invoice when opened via deep-link
+  useEffect(() => {
+    if (open && preselectedInvoiceId && invoices.length > 0 && !selectedInvoice) {
+      const match = (invoices as any[]).find((inv) => inv.invoice?.id === preselectedInvoiceId);
+      if (match) handleSelectInvoice(match);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, preselectedInvoiceId, invoices]);
   const [search, setSearch] = useState("");
 
   const [form, setForm] = useState({
@@ -400,9 +408,25 @@ function UpdateStatusDialog({ jobCard, open, onClose }: { jobCard: any; open: bo
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function JobCardGenerator() {
   const [generateOpen, setGenerateOpen] = useState(false);
+  const [preselectedInvoiceId, setPreselectedInvoiceId] = useState<number | undefined>();
   const [updateTarget, setUpdateTarget] = useState<any>(null);
   const [search, setSearch] = useState("");
   const [activeTab, setActiveTab] = useState("all");
+
+  // Read ?invoiceId=X from URL and auto-open the dialog
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get("invoiceId");
+    if (id) {
+      const numId = parseInt(id, 10);
+      if (!isNaN(numId)) {
+        setPreselectedInvoiceId(numId);
+        setGenerateOpen(true);
+        // Clean the URL so refreshing doesn't re-trigger
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    }
+  }, []);
 
   const { data: jobCards = [], isLoading } = trpc.jobCards.list.useQuery(
     activeTab === "all" ? undefined : { status: activeTab },
@@ -610,7 +634,7 @@ export default function JobCardGenerator() {
       </Tabs>
 
       {/* Dialogs */}
-      <GenerateDialog open={generateOpen} onClose={() => setGenerateOpen(false)} />
+      <GenerateDialog open={generateOpen} onClose={() => { setGenerateOpen(false); setPreselectedInvoiceId(undefined); }} preselectedInvoiceId={preselectedInvoiceId} />
       {updateTarget && (
         <UpdateStatusDialog
           jobCard={updateTarget}
