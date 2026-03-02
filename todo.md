@@ -63,3 +63,15 @@
 
 ## Bug Fixes
 - [x] Fix "Maximum update depth exceeded" infinite loop on /clock-in page
+
+## PIN-Based Clock-In Feature
+- [x] Add `pin` (hashed) and `pinSet` fields to employees table schema
+- [x] Generate and apply migration SQL
+- [x] Add DB helpers: setEmployeePin, verifyEmployeePin, clockInByPin, clockOutByPin
+- [x] Add tRPC procedures: shifts.setPin, shifts.clockInByPin, shifts.clockOutByPin
+- [x] Build PinKiosk page: numpad UI, employee lookup by PIN, clock-in/out confirmation
+- [x] Add PIN setup UI to Employees page (Set/Change PIN button per employee)
+- [x] Add PinKiosk route (/kiosk) to App.tsx — no sidebar, full-screen kiosk mode
+- [x] Add Kiosk link to sidebar under Team
+- [x] Write vitest tests for PIN procedures
+- [x] Save checkpoint

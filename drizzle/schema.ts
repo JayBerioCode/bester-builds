@@ -216,6 +216,9 @@ export const employees = mysqlTable("employees", {
   hourlyRate: decimal("hourlyRate", { precision: 8, scale: 2 }),
   skills: text("skills"),
   notes: text("notes"),
+  /** Bcrypt hash of the employee's 4-digit clock-in PIN. Null means no PIN set. */
+  pinHash: varchar("pinHash", { length: 255 }),
+  pinSet: boolean("pinSet").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });

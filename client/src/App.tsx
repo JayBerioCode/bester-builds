@@ -16,26 +16,34 @@ import Payments from "./pages/Payments";
 import Analytics from "./pages/Analytics";
 import Scheduling from "./pages/Scheduling";
 import ClockIn from "./pages/ClockIn";
+import PinKiosk from "./pages/PinKiosk";
 
 function Router() {
   return (
-    <DashboardLayout>
-      <Switch>
-        <Route path="/" component={Dashboard} />
-        <Route path="/crm" component={CRM} />
-        <Route path="/inventory" component={Inventory} />
-        <Route path="/orders" component={Orders} />
-        <Route path="/invoices" component={Invoices} />
-        <Route path="/employees" component={Employees} />
-        <Route path="/tasks" component={Tasks} />
-        <Route path="/payments" component={Payments} />
-        <Route path="/analytics" component={Analytics} />
-        <Route path="/scheduling" component={Scheduling} />
-        <Route path="/clock-in" component={ClockIn} />
-        <Route path="/404" component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
-    </DashboardLayout>
+    <Switch>
+      {/* Full-screen kiosk — no sidebar */}
+      <Route path="/kiosk" component={PinKiosk} />
+      {/* All other routes use the dashboard layout */}
+      <Route>
+        <DashboardLayout>
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/crm" component={CRM} />
+            <Route path="/inventory" component={Inventory} />
+            <Route path="/orders" component={Orders} />
+            <Route path="/invoices" component={Invoices} />
+            <Route path="/employees" component={Employees} />
+            <Route path="/tasks" component={Tasks} />
+            <Route path="/payments" component={Payments} />
+            <Route path="/analytics" component={Analytics} />
+            <Route path="/scheduling" component={Scheduling} />
+            <Route path="/clock-in" component={ClockIn} />
+            <Route path="/404" component={NotFound} />
+            <Route component={NotFound} />
+          </Switch>
+        </DashboardLayout>
+      </Route>
+    </Switch>
   );
 }
 

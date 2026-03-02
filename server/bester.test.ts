@@ -60,6 +60,13 @@ vi.mock("./db", () => ({
   clockIn: vi.fn().mockResolvedValue({ id: 1, employeeId: 1, clockIn: new Date(), clockOut: null, hoursWorked: null, earnings: null, notes: null, createdAt: new Date(), updatedAt: new Date() }),
   clockOut: vi.fn().mockResolvedValue({ id: 1, employeeId: 1, clockIn: new Date(Date.now() - 3600000), clockOut: new Date(), hoursWorked: "1.00", earnings: "75.00", notes: null, createdAt: new Date(), updatedAt: new Date() }),
   getShiftSummary: vi.fn().mockResolvedValue([{ employeeId: 1, employeeName: "John Doe", employeeRole: "print_operator", hourlyRate: "75.00", totalShifts: 5, totalHours: 40, totalEarnings: 3000 }]),
+  // PIN helpers
+  setEmployeePin: vi.fn().mockResolvedValue(undefined),
+  clearEmployeePin: vi.fn().mockResolvedValue(undefined),
+  findEmployeeByPin: vi.fn().mockResolvedValue({ id: 1, name: "John Doe", role: "print_operator", pinSet: true, status: "active", hourlyRate: "75.00" }),
+  clockInByPin: vi.fn().mockResolvedValue({ employee: { id: 1, name: "John Doe", role: "print_operator", pinSet: true, status: "active", hourlyRate: "75.00" }, shift: { id: 2, employeeId: 1, clockIn: new Date(), clockOut: null, hoursWorked: null, earnings: null, notes: null } }),
+  clockOutByPin: vi.fn().mockResolvedValue({ employee: { id: 1, name: "John Doe", role: "print_operator", pinSet: true, status: "active", hourlyRate: "75.00" }, shift: { id: 2, employeeId: 1, clockIn: new Date(Date.now() - 3600000), clockOut: new Date(), hoursWorked: "1.00", earnings: "75.00", notes: null } }),
+  hashPin: vi.fn().mockResolvedValue("$2b$10$hashedpin"),
 }));
 
 // ─── Auth context factory ─────────────────────────────────────────────────────
@@ -382,5 +389,70 @@ describe("shifts.summary", () => {
       to: new Date("2026-12-31"),
     });
     expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+// ─── PIN Clock-In Tests ───────────────────────────────────────────────────────
+describe("shifts.setPin", () => {
+  it("sets a 4-digit PIN for an employee", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.setPin({ employeeId: 1, pin: "1234" });
+    expect(result).toBeUndefined(); // returns void
+  });
+
+  it("rejects a PIN that is not 4 digits", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.shifts.setPin({ employeeId: 1, pin: "123" })).rejects.toThrow();
+  });
+
+  it("rejects a PIN containing non-numeric characters", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    await expect(caller.shifts.setPin({ employeeId: 1, pin: "12ab" })).rejects.toThrow();
+  });
+});
+
+describe("shifts.clearPin", () => {
+  it("clears an employee's PIN", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.clearPin({ employeeId: 1 });
+    expect(result).toBeUndefined();
+  });
+});
+
+describe("shifts.lookupByPin", () => {
+  it("returns employee data for a valid PIN", async () => {
+    const caller = appRouter.createCaller(makeCtx());
+    const result = await caller.shifts.lookupByPin({ pin: "1234" });
+    expect(result).not.toBeNull();
+    expect((result as any)?.name).toBe("John Doe");
+  });
+
+  it("is accessible without authentication (public procedure)", async () => {
+    const publicCtx = { ...makeCtx(), user: null };
+    const caller = appRouter.createCaller(publicCtx);
+    const result = await caller.shifts.lookupByPin({ pin: "1234" });
+    expect(result).toBeDefined();
+  });
+});
+
+describe("shifts.clockInByPin", () => {
+  it("clocks in an employee using their PIN", async () => {
+    const publicCtx = { ...makeCtx(), user: null };
+    const caller = appRouter.createCaller(publicCtx);
+    const result = await caller.shifts.clockInByPin({ pin: "1234" });
+    expect(result).toBeDefined();
+    expect((result as any).employee.name).toBe("John Doe");
+    expect((result as any).shift.clockOut).toBeNull();
+  });
+});
+
+describe("shifts.clockOutByPin", () => {
+  it("clocks out an employee using their PIN and returns hours and earnings", async () => {
+    const publicCtx = { ...makeCtx(), user: null };
+    const caller = appRouter.createCaller(publicCtx);
+    const result = await caller.shifts.clockOutByPin({ pin: "1234" });
+    expect(result).toBeDefined();
+    expect((result as any).shift.hoursWorked).toBe("1.00");
+    expect((result as any).shift.earnings).toBe("75.00");
   });
 });

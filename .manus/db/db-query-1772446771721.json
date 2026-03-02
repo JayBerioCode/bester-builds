@@ -1,0 +1,9 @@
+{
+  "query": "ALTER TABLE `employees` ADD `pinHash` varchar(255);\nALTER TABLE `employees` ADD `pinSet` boolean DEFAULT false NOT NULL;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user L5cn9KkH5feXQZL.6ddb75b4ae08 --database WwME9AmZKtjnw8sLvcXv7V --execute ALTER TABLE `employees` ADD `pinHash` varchar(255);\nALTER TABLE `employees` ADD `pinSet` boolean DEFAULT false NOT NULL;",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 890
+}

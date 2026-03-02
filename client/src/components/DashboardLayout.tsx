@@ -33,6 +33,7 @@ import {
   CreditCard,
   LayoutDashboard,
   LogOut,
+  Monitor,
   PanelLeft,
   Printer,
   Users,
@@ -75,6 +76,7 @@ const menuGroups = [
     items: [
       { icon: Users2, label: "Employees", path: "/employees" },
       { icon: Clock, label: "Clock In/Out", path: "/clock-in" },
+      { icon: Monitor, label: "PIN Kiosk", path: "/kiosk" },
     ],
   },
 ];

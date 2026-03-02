@@ -1,4 +1,5 @@
 import { and, desc, eq, gte, like, lte, or, sql } from "drizzle-orm";
+import bcrypt from "bcryptjs";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
@@ -569,4 +570,139 @@ export async function getShiftSummary(employeeId?: number, from?: Date, to?: Dat
     .where(and(...conditions))
     .groupBy(shiftLogs.employeeId, employees.name, employees.role, employees.hourlyRate)
     .orderBy(desc(sql`SUM(${shiftLogs.earnings})`));
+}
+
+// ─── PIN Clock-In Helpers ─────────────────────────────────────────────────────
+
+/** Hash a 4-digit PIN using bcrypt (salt rounds = 10). */
+export async function hashPin(pin: string): Promise<string> {
+  return bcrypt.hash(pin, 10);
+}
+
+/** Set or update an employee's clock-in PIN. */
+export async function setEmployeePin(employeeId: number, pin: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  const pinHash = await hashPin(pin);
+  await db
+    .update(employees)
+    .set({ pinHash, pinSet: true })
+    .where(eq(employees.id, employeeId));
+}
+
+/** Remove an employee's PIN (admin reset). */
+export async function clearEmployeePin(employeeId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(employees)
+    .set({ pinHash: null, pinSet: false })
+    .where(eq(employees.id, employeeId));
+}
+
+/**
+ * Look up an employee by PIN.
+ * Returns the employee record (without pinHash) if the PIN matches, or null.
+ */
+export async function findEmployeeByPin(pin: string): Promise<Omit<typeof employees.$inferSelect, "pinHash"> | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  // Fetch all employees that have a PIN set (pinHash is not null)
+  const rows = await db
+    .select()
+    .from(employees)
+    .where(eq(employees.pinSet, true));
+
+  for (const emp of rows) {
+    if (emp.pinHash && await bcrypt.compare(pin, emp.pinHash)) {
+      // Return employee data without exposing the hash
+      const { pinHash: _h, ...safe } = emp;
+      return safe;
+    }
+  }
+  return null;
+}
+
+/**
+ * Clock in an employee identified by their PIN.
+ * Returns the new shift record, or throws if PIN is invalid or employee already clocked in.
+ */
+export async function clockInByPin(pin: string, notes?: string) {
+  const emp = await findEmployeeByPin(pin);
+  if (!emp) throw new Error("Invalid PIN. Please try again.");
+
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable.");
+
+  // Check for an open shift
+  const existing = await db
+    .select()
+    .from(shiftLogs)
+    .where(and(eq(shiftLogs.employeeId, emp.id), sql`${shiftLogs.clockOut} IS NULL`))
+    .limit(1);
+
+  if (existing.length > 0) {
+    throw new Error(`${emp.name} is already clocked in.`);
+  }
+
+  await db.insert(shiftLogs).values({
+    employeeId: emp.id,
+    clockIn: new Date(),
+    notes: notes ?? null,
+  });
+
+  const [newShift] = await db
+    .select()
+    .from(shiftLogs)
+    .where(and(eq(shiftLogs.employeeId, emp.id), sql`${shiftLogs.clockOut} IS NULL`))
+    .orderBy(desc(shiftLogs.clockIn))
+    .limit(1);
+
+  return { employee: emp, shift: newShift };
+}
+
+/**
+ * Clock out an employee identified by their PIN.
+ * Calculates hours worked and earnings, then updates the shift record.
+ */
+export async function clockOutByPin(pin: string) {
+  const emp = await findEmployeeByPin(pin);
+  if (!emp) throw new Error("Invalid PIN. Please try again.");
+
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable.");
+
+  const [openShift] = await db
+    .select()
+    .from(shiftLogs)
+    .where(and(eq(shiftLogs.employeeId, emp.id), sql`${shiftLogs.clockOut} IS NULL`))
+    .orderBy(desc(shiftLogs.clockIn))
+    .limit(1);
+
+  if (!openShift) {
+    throw new Error(`${emp.name} is not currently clocked in.`);
+  }
+
+  const clockOut = new Date();
+  const hoursWorked = (clockOut.getTime() - new Date(openShift.clockIn).getTime()) / 3600000;
+  const hourlyRate = parseFloat((emp.hourlyRate as string | null) ?? "0");
+  const earnings = hoursWorked * hourlyRate;
+
+  await db
+    .update(shiftLogs)
+    .set({
+      clockOut,
+      hoursWorked: hoursWorked.toFixed(4),
+      earnings: earnings.toFixed(2),
+    })
+    .where(eq(shiftLogs.id, openShift.id));
+
+  const [updated] = await db
+    .select()
+    .from(shiftLogs)
+    .where(eq(shiftLogs.id, openShift.id))
+    .limit(1);
+
+  return { employee: emp, shift: updated };
 }

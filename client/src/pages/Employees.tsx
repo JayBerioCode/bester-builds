@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
-import { Plus, Users2, Phone, Mail, Trash2, Edit } from "lucide-react";
+import { Plus, Users2, Phone, Mail, Trash2, Edit, KeyRound, ShieldCheck, ShieldOff } from "lucide-react";
 
 const roleColors: Record<string, string> = {
   manager: "bg-violet-100 text-violet-700",
@@ -121,9 +121,104 @@ function EmployeeForm({ onSuccess, initial }: { onSuccess: () => void; initial?:
   );
 }
 
+// ─── PIN Management Dialog ───────────────────────────────────────────────────
+function PinDialog({ employee, onClose }: { employee: any; onClose: () => void }) {
+  const [pin, setPin] = useState("");
+  const [confirmPin, setConfirmPin] = useState("");
+  const utils = trpc.useUtils();
+
+  const setPin_ = trpc.shifts.setPin.useMutation({
+    onSuccess: () => {
+      utils.employees.list.invalidate();
+      toast.success(`PIN set for ${employee.name}`);
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const clearPin = trpc.shifts.clearPin.useMutation({
+    onSuccess: () => {
+      utils.employees.list.invalidate();
+      toast.success(`PIN cleared for ${employee.name}`);
+      onClose();
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleSet = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (pin.length !== 4 || !/^\d{4}$/.test(pin)) return toast.error("PIN must be exactly 4 digits");
+    if (pin !== confirmPin) return toast.error("PINs do not match");
+    setPin_.mutate({ employeeId: employee.id, pin });
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+        <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+          <span className="font-bold text-primary">{employee.name.charAt(0).toUpperCase()}</span>
+        </div>
+        <div>
+          <p className="font-semibold">{employee.name}</p>
+          <p className="text-xs text-muted-foreground capitalize">{employee.role?.replace(/_/g, " ")}</p>
+        </div>
+        <div className="ml-auto">
+          {employee.pinSet
+            ? <Badge className="bg-emerald-100 text-emerald-700 gap-1"><ShieldCheck className="h-3 w-3" />PIN Set</Badge>
+            : <Badge className="bg-slate-100 text-slate-500 gap-1"><ShieldOff className="h-3 w-3" />No PIN</Badge>}
+        </div>
+      </div>
+
+      <form onSubmit={handleSet} className="space-y-3">
+        <div className="space-y-1.5">
+          <Label>New 4-Digit PIN</Label>
+          <Input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={pin}
+            onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="••••"
+            className="tracking-widest text-center text-lg"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label>Confirm PIN</Label>
+          <Input
+            type="password"
+            inputMode="numeric"
+            maxLength={4}
+            value={confirmPin}
+            onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            placeholder="••••"
+            className="tracking-widest text-center text-lg"
+          />
+        </div>
+        <Button type="submit" className="w-full" disabled={setPin_.isPending || pin.length !== 4 || confirmPin.length !== 4}>
+          <KeyRound className="h-4 w-4 mr-1" />
+          {employee.pinSet ? "Update PIN" : "Set PIN"}
+        </Button>
+      </form>
+
+      {employee.pinSet && (
+        <Button
+          variant="outline"
+          className="w-full text-destructive hover:text-destructive"
+          onClick={() => { if (confirm(`Clear PIN for ${employee.name}?`)) clearPin.mutate({ employeeId: employee.id }); }}
+          disabled={clearPin.isPending}
+        >
+          <ShieldOff className="h-4 w-4 mr-1" />Clear PIN
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export default function Employees() {
   const [open, setOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState<any>(null);
+  const [pinEmployee, setPinEmployee] = useState<any>(null);
+  const [pinOpen, setPinOpen] = useState(false);
 
   const utils = trpc.useUtils();
   const { data: employees = [], isLoading } = trpc.employees.list.useQuery();
@@ -226,7 +321,13 @@ export default function Employees() {
                     )}
                   </div>
                 </div>
-                <div className="flex gap-2 mt-4 pt-3 border-t">
+                {/* PIN status indicator */}
+                <div className="mt-3">
+                  {(emp as any).pinSet
+                    ? <Badge className="text-[10px] px-2 py-0 bg-emerald-100 text-emerald-700 gap-1"><ShieldCheck className="h-3 w-3" />PIN Active</Badge>
+                    : <Badge className="text-[10px] px-2 py-0 bg-slate-100 text-slate-500 gap-1"><ShieldOff className="h-3 w-3" />No PIN</Badge>}
+                </div>
+                <div className="flex gap-2 mt-3 pt-3 border-t">
                   <Button
                     variant="outline"
                     size="sm"
@@ -238,8 +339,16 @@ export default function Employees() {
                   <Button
                     variant="outline"
                     size="sm"
+                    className="flex-1"
+                    onClick={() => { setPinEmployee(emp); setPinOpen(true); }}
+                  >
+                    <KeyRound className="h-3.5 w-3.5 mr-1" />PIN
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
                     className="text-destructive hover:text-destructive"
-                    onClick={() => { if (confirm("Remove this employee?")) deleteEmployee.mutate({ id: emp.id }); }}
+                    onClick={() => { if (window.confirm("Remove this employee?")) deleteEmployee.mutate({ id: emp.id }); }}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -249,6 +358,19 @@ export default function Employees() {
           ))}
         </div>
       )}
+
+      {/* PIN Management Dialog */}
+      <Dialog open={pinOpen} onOpenChange={(o) => { setPinOpen(o); if (!o) setPinEmployee(null); }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader><DialogTitle>Manage Clock-In PIN</DialogTitle></DialogHeader>
+          {pinEmployee && (
+            <PinDialog
+              employee={pinEmployee}
+              onClose={() => { setPinOpen(false); setPinEmployee(null); }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

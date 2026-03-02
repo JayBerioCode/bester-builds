@@ -56,6 +56,11 @@ import {
   getActiveShift,
   getShiftLogs,
   getShiftSummary,
+  setEmployeePin,
+  clearEmployeePin,
+  clockInByPin,
+  clockOutByPin,
+  findEmployeeByPin,
 } from "./db";
 
 // ─── CRM Router ──────────────────────────────────────────────────────────────
@@ -543,6 +548,39 @@ const shiftsRouter = router({
       to: z.date().optional(),
     }).optional())
     .query(({ input }) => getShiftSummary(input?.employeeId, input?.from, input?.to)),
+
+  /** Set or update an employee's 4-digit clock-in PIN (admin only) */
+  setPin: protectedProcedure
+    .input(z.object({
+      employeeId: z.number(),
+      pin: z.string().length(4).regex(/^\d{4}$/, "PIN must be exactly 4 digits"),
+    }))
+    .mutation(({ input }) => setEmployeePin(input.employeeId, input.pin)),
+
+  /** Clear/reset an employee's PIN (admin only) */
+  clearPin: protectedProcedure
+    .input(z.object({ employeeId: z.number() }))
+    .mutation(({ input }) => clearEmployeePin(input.employeeId)),
+
+  /** Check if a PIN is valid and return the employee (without hash) — public so kiosk works unauthenticated */
+  lookupByPin: publicProcedure
+    .input(z.object({ pin: z.string().length(4) }))
+    .query(({ input }) => findEmployeeByPin(input.pin)),
+
+  /** Clock in using a PIN — public so kiosk works unauthenticated */
+  clockInByPin: publicProcedure
+    .input(z.object({
+      pin: z.string().length(4),
+      notes: z.string().optional(),
+    }))
+    .mutation(({ input }) => clockInByPin(input.pin, input.notes)),
+
+  /** Clock out using a PIN — public so kiosk works unauthenticated */
+  clockOutByPin: publicProcedure
+    .input(z.object({
+      pin: z.string().length(4),
+    }))
+    .mutation(({ input }) => clockOutByPin(input.pin)),
 });
 
 // ─── App Router ──────────────────────────────────────────────────────────────
