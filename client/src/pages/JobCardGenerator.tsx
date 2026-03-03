@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
-import { JobCardKanban } from "@/components/JobCardKanban";
+import { JobCardKanban, isOverdue } from "@/components/JobCardKanban";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +53,7 @@ import {
   User,
   LayoutList,
   Columns,
+  AlertCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
@@ -926,8 +927,13 @@ export default function JobCardGenerator() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filtered.map((jc: any) => (
-                      <TableRow key={jc.jobCard.id}>
+                    {filtered.map((jc: any) => {
+                      const overdue = isOverdue(jc.jobCard.dueDate, jc.jobCard.status);
+                      return (
+                      <TableRow
+                        key={jc.jobCard.id}
+                        className={overdue ? "border-l-4 border-l-red-400 dark:border-l-red-600 bg-red-50/40 dark:bg-red-900/10" : ""}
+                      >
                         <TableCell className="font-mono font-semibold text-purple-600 text-sm">
                           {jc.jobCard.jobCardNumber}
                         </TableCell>
@@ -968,7 +974,9 @@ export default function JobCardGenerator() {
                             <span className="text-muted-foreground italic text-xs">Unassigned</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className={`text-sm ${
+                          overdue ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"
+                        }`}>
                           {jc.jobCard.dueDate ? (
                             <div className="flex items-center gap-1.5">
                               <Calendar className="w-3.5 h-3.5" />
@@ -977,7 +985,14 @@ export default function JobCardGenerator() {
                           ) : "—"}
                         </TableCell>
                         <TableCell>
-                          <StatusBadge status={jc.jobCard.status} />
+                          <div className="flex flex-col gap-1">
+                            <StatusBadge status={jc.jobCard.status} />
+                            {overdue && (
+                              <Badge className="text-[10px] bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 gap-0.5 px-1.5 py-0 w-fit font-semibold">
+                                <AlertCircle className="w-2.5 h-2.5" />Overdue
+                              </Badge>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-2">
@@ -1001,7 +1016,8 @@ export default function JobCardGenerator() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
                 </div>

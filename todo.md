@@ -305,3 +305,10 @@
 - [x] DashboardLayout: main content padding reduced to p-3 on mobile (was p-6)
 - [x] DashboardLayout: shadcn Sidebar already handles mobile overlay natively via SidebarTrigger
 - [x] Run tests (138/138 passing) and save checkpoint
+
+## Overdue Job Card Highlighting
+- [x] Add isOverdue() helper (past due date, status pending or in_progress)
+- [x] Kanban card: red border-2 + "Overdue" badge + red due date text when overdue
+- [x] List view table row: red left border-l-4 + red background tint + "Overdue" badge in status cell + red due date text
+- [x] Write vitest tests for isOverdue (9 tests, all passing)
+- [x] Save checkpoint

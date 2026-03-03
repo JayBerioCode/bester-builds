@@ -15,6 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  AlertCircle,
   Clock,
   PlayCircle,
   CheckCircle2,
@@ -28,6 +29,19 @@ import {
   GripVertical,
 } from "lucide-react";
 import { format } from "date-fns";
+
+// ─── Overdue helper ───────────────────────────────────────────────────────────
+/** Returns true when the job is past its due date and still actionable.
+ *  Compares YYYY-MM-DD strings so the result is timezone-safe. */
+export function isOverdue(dueDate: string | null | undefined, status: string): boolean {
+  if (!dueDate) return false;
+  if (status === "completed" || status === "cancelled") return false;
+  // Extract local today as YYYY-MM-DD to avoid UTC vs local mismatch
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  // dueDate is already stored as YYYY-MM-DD; string comparison works for ISO dates
+  return dueDate < todayStr;
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface JobCardItem {
@@ -106,11 +120,17 @@ function KanbanCard({
     ? { transform: CSS.Translate.toString(transform) }
     : undefined;
 
+  const overdue = isOverdue(item.jobCard.dueDate, item.jobCard.status);
+
   return (
     <div
       ref={setNodeRef}
       style={style}
-      className={`bg-card border rounded-lg p-3 shadow-sm select-none transition-shadow ${
+      className={`bg-card rounded-lg p-3 shadow-sm select-none transition-shadow border-2 ${
+        overdue
+          ? "border-red-400 dark:border-red-600 shadow-red-100 dark:shadow-red-900/20"
+          : "border-border"
+      } ${
         isDragging ? "opacity-0" : "hover:shadow-md"
       }`}
     >
@@ -129,11 +149,18 @@ function KanbanCard({
             {item.jobCard.jobCardNumber}
           </span>
         </div>
-        {item.jobCard.poNumber && (
-          <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-300 gap-0.5 font-mono shrink-0 px-1.5 py-0">
-            <Hash className="w-2.5 h-2.5" />{item.jobCard.poNumber}
-          </Badge>
-        )}
+        <div className="flex items-center gap-1 shrink-0">
+          {overdue && (
+            <Badge className="text-[10px] bg-red-100 text-red-700 border-red-300 dark:bg-red-900/30 dark:text-red-400 dark:border-red-700 gap-0.5 px-1.5 py-0 font-semibold">
+              <AlertCircle className="w-2.5 h-2.5" />Overdue
+            </Badge>
+          )}
+          {item.jobCard.poNumber && (
+            <Badge variant="outline" className="text-[10px] text-purple-600 border-purple-300 gap-0.5 font-mono px-1.5 py-0">
+              <Hash className="w-2.5 h-2.5" />{item.jobCard.poNumber}
+            </Badge>
+          )}
+        </div>
       </div>
 
       {/* Title */}
@@ -170,7 +197,9 @@ function KanbanCard({
           </div>
         )}
         {item.jobCard.dueDate && (
-          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <div className={`flex items-center gap-1.5 text-[11px] ${
+            overdue ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground"
+          }`}>
             <Calendar className="w-3 h-3 shrink-0" />
             <span>{format(new Date(item.jobCard.dueDate), "dd MMM yyyy")}</span>
           </div>
