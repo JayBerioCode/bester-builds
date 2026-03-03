@@ -217,7 +217,7 @@ function KanbanColumn({
   const { setNodeRef, isOver } = useDroppable({ id: col.id });
 
   return (
-    <div className="flex flex-col min-w-[240px] w-full">
+    <div className="flex flex-col min-w-[260px] sm:min-w-0 w-full">
       {/* Column header */}
       <div className={`flex items-center justify-between px-3 py-2 rounded-t-lg border ${col.headerClass}`}>
         <div className="flex items-center gap-2 text-sm font-semibold">
@@ -314,7 +314,7 @@ export function JobCardKanban({
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pb-4">
+      <div className="flex gap-4 pb-4 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-2 lg:grid-cols-4">
         {COLUMNS.map((col) => (
           <KanbanColumn
             key={col.id}

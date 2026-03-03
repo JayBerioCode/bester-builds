@@ -179,7 +179,7 @@ function GenerateDialog({ open, onClose, preselectedInvoiceId }: { open: boolean
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-purple-500" />
@@ -422,7 +422,7 @@ function UpdateStatusDialog({ jobCard, open, onClose }: { jobCard: any; open: bo
 
   return (
     <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-purple-500" />
@@ -596,7 +596,7 @@ function ManualJobCardDialog({ open, onClose }: { open: boolean; onClose: () => 
   const set = (k: string, v: string) => setForm((f) => ({ ...f, [k]: v }));
   return (
     <Dialog open={open} onOpenChange={(v) => !v && handleClose()}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-full max-w-2xl max-h-[95dvh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-purple-500" />
@@ -792,9 +792,9 @@ export default function JobCardGenerator() {
   };
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl">
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <ClipboardList className="w-6 h-6 text-purple-500" />
@@ -804,7 +804,7 @@ export default function JobCardGenerator() {
             Generate printable job cards from invoices with purchase order numbers.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* View toggle */}
           <div className="flex items-center border rounded-lg overflow-hidden">
             <button
@@ -849,7 +849,7 @@ export default function JobCardGenerator() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: "Total", count: counts.all, color: "purple", icon: <ClipboardList className="w-4 h-4 text-purple-600" /> },
           { label: "Pending", count: counts.pending, color: "amber", icon: <Clock className="w-4 h-4 text-amber-600" /> },
@@ -886,7 +886,7 @@ export default function JobCardGenerator() {
       </div>
 
       {/* Tabs + Table (List view) */}
-      {viewMode === "list" && <Tabs value={activeTab} onValueChange={setActiveTab}>
+      {viewMode === "list" && <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList>
           <TabsTrigger value="all">All ({counts.all})</TabsTrigger>
           <TabsTrigger value="pending">Pending ({counts.pending})</TabsTrigger>
@@ -910,6 +910,7 @@ export default function JobCardGenerator() {
                   </p>
                 </div>
               ) : (
+                <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -1003,6 +1004,7 @@ export default function JobCardGenerator() {
                     ))}
                   </TableBody>
                 </Table>
+                </div>
               )}
             </CardContent>
           </Card>

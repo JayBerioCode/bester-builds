@@ -292,3 +292,16 @@
 - [x] Register service worker in client/src/main.tsx
 - [x] Add PwaInstallBanner component (Android native prompt + iOS manual instructions)
 - [x] Save checkpoint
+## Mobile Layout Refinement
+- [x] Dashboard: stats grid 2-col on mobile (was 4-col), smaller padding and font sizes
+- [x] Dashboard: Quick Access 3-col on mobile with smaller icons/text
+- [x] Dashboard: module overview cards stack cleanly on all screen sizes
+- [x] Dashboard: header stacks vertically on mobile (date badge below title)
+- [x] Job Cards: stats row 2-col on mobile (was 4-col)
+- [x] Job Cards: list view table wrapped in overflow-x-auto for horizontal scroll
+- [x] Job Cards: kanban board horizontal scroll with 260px fixed-width columns on mobile
+- [x] Job Cards: all dialogs use max-h-[95dvh] and full-width on mobile
+- [x] Job Cards: page header stacks vertically on mobile
+- [x] DashboardLayout: main content padding reduced to p-3 on mobile (was p-6)
+- [x] DashboardLayout: shadcn Sidebar already handles mobile overlay natively via SidebarTrigger
+- [x] Run tests (138/138 passing) and save checkpoint
