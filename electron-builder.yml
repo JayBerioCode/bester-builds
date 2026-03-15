@@ -2,13 +2,33 @@ appId: com.besterbuilds.app
 productName: Bester.Builds
 copyright: "Copyright © 2025 Bester.Builds"
 
-# Files to include in the app bundle
+# ─── Publish config ───────────────────────────────────────────────────────────
+# Used by electron-updater to find update metadata on GitHub Releases.
+# GH_TOKEN must be set in the CI environment when running electron-builder.
+publish:
+  provider: github
+  owner: JayBerioCode
+  repo: bester-builds
+  releaseType: release
+
+# ─── Files to include in the app bundle ──────────────────────────────────────
 files:
-  - electron/**
+  - electron/**/*.cjs
+  - electron/icon.png
+  - electron/icon.ico
   - dist/public/**
   - "!node_modules/**"
+  # electron-updater must be bundled (runtime dep, not devDep)
+  - node_modules/electron-updater/**
+  - node_modules/builder-util-runtime/**
+  - node_modules/fs-extra/**
+  - node_modules/graceful-fs/**
+  - node_modules/jsonfile/**
+  - node_modules/universalify/**
+  - node_modules/semver/**
+  - node_modules/lodash.isequal/**
 
-# Extra resources copied alongside the app (server bundle)
+# ─── Extra resources ─────────────────────────────────────────────────────────
 extraResources:
   - from: dist/server.mjs
     to: server.mjs
@@ -19,7 +39,7 @@ directories:
   output: release
   buildResources: electron
 
-# Windows NSIS installer
+# ─── Windows ─────────────────────────────────────────────────────────────────
 win:
   icon: electron/icon.ico
   target:
@@ -27,6 +47,30 @@ win:
       arch:
         - x64
 
+  # ── Code signing ────────────────────────────────────────────────────────────
+  # electron-builder reads the certificate from the CSC_LINK / CSC_KEY_PASSWORD
+  # environment variables set in CI.  When those variables are absent (local dev,
+  # unsigned builds) the block below is still valid — signing is simply skipped.
+  #
+  # Supported certificate formats:
+  #   - .pfx / .p12  (PKCS#12, most common — set CSC_LINK to a file:// path or
+  #                   a base64-encoded data: URI)
+  #   - Azure Key Vault (set AZURE_KEY_VAULT_* env vars instead)
+  #
+  # signtoolOptions configures the Windows code-signing tool.
+  # These settings are only active when CSC_LINK / CSC_KEY_PASSWORD are set.
+  signtoolOptions:
+    # SHA-256 required for Windows 10+ SmartScreen; SHA-1 kept for Win 7/8.
+    signingHashAlgorithms:
+      - sha256
+      - sha1
+    # RFC 3161 timestamp so the signature stays valid after certificate expiry.
+    rfc3161TimeStampServer: http://timestamp.digicert.com
+    # Optional: restrict to a specific certificate CN to avoid signing with the
+    # wrong cert when multiple are installed.
+    # certificateSubjectName: "Bester.Builds (Pty) Ltd"
+
+# ─── NSIS installer ──────────────────────────────────────────────────────────
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
@@ -36,13 +80,18 @@ nsis:
   createStartMenuShortcut: true
   shortcutName: "Bester.Builds"
   deleteAppDataOnUninstall: false
+  # Sign the installer itself (in addition to the app binary)
+  # electron-builder does this automatically when CSC_LINK is set.
 
-# macOS (optional, for future use)
+# ─── macOS (future use) ───────────────────────────────────────────────────────
 mac:
   category: public.app-category.business
   target:
     - dmg
+  # macOS signing uses APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID
+  # and the CSC_LINK / CSC_KEY_PASSWORD variables (same pattern as Windows).
 
+# ─── Linux (future use) ──────────────────────────────────────────────────────
 linux:
   target:
     - AppImage
