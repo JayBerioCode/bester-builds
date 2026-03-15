@@ -312,3 +312,12 @@
 - [x] List view table row: red left border-l-4 + red background tint + "Overdue" badge in status cell + red due date text
 - [x] Write vitest tests for isOverdue (9 tests, all passing)
 - [x] Save checkpoint
+
+## Electron Desktop App (.exe)
+- [x] Create electron/ directory with main.js (main process) and preload.js
+- [x] Create electron-builder.yml config targeting Windows NSIS installer
+- [x] Add electron build scripts to package.json
+- [x] Build Vite client bundle (dist/public)
+- [x] Bundle Express server with esbuild into dist/server.mjs
+- [x] Package with electron-builder to produce Windows NSIS installer (97 MB)
+- [x] Upload and deliver .exe to user

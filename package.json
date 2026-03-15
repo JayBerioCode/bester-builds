@@ -10,7 +10,12 @@
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate"
+    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "electron:build-server": "esbuild server/_core/index.ts --bundle --platform=node --target=node20 --format=esm --outfile=dist/server.mjs --external:vite --external:@vitejs/plugin-react --external:@tailwindcss/vite --external:vite-plugin-manus-runtime --external:@builder.io/vite-plugin-jsx-loc --external:electron --define:process.env.NODE_ENV=\"production\"",
+    "electron:build-client": "vite build",
+    "electron:build": "pnpm electron:build-client && pnpm electron:build-server",
+    "electron:package": "electron-builder --config electron-builder.yml --win",
+    "electron:dist": "pnpm electron:build && pnpm electron:package"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",
@@ -97,6 +102,8 @@
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",
     "drizzle-kit": "^0.31.4",
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1",
     "esbuild": "^0.25.0",
     "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
@@ -116,6 +123,11 @@
     },
     "overrides": {
       "tailwindcss>nanoid": "3.3.7"
-    }
-  }
+    },
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller"
+    ]
+  },
+  "main": "electron/main.js"
 }

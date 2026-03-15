@@ -1,0 +1,48 @@
+appId: com.besterbuilds.app
+productName: Bester.Builds
+copyright: "Copyright © 2025 Bester.Builds"
+
+# Files to include in the app bundle
+files:
+  - electron/**
+  - dist/public/**
+  - "!node_modules/**"
+
+# Extra resources copied alongside the app (server bundle)
+extraResources:
+  - from: dist/server.mjs
+    to: server.mjs
+  - from: dist/public
+    to: public
+
+directories:
+  output: release
+  buildResources: electron
+
+# Windows NSIS installer
+win:
+  icon: electron/icon.ico
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: electron/icon.ico
+  uninstallerIcon: electron/icon.ico
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "Bester.Builds"
+  deleteAppDataOnUninstall: false
+
+# macOS (optional, for future use)
+mac:
+  category: public.app-category.business
+  target:
+    - dmg
+
+linux:
+  target:
+    - AppImage
