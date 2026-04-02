@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { JobCardKanban, isOverdue } from "@/components/JobCardKanban";
 import { Button } from "@/components/ui/button";
@@ -793,61 +794,56 @@ export default function JobCardGenerator() {
   };
 
   return (
-      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6 max-w-7xl">
+      <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <ClipboardList className="w-6 h-6 text-purple-500" />
-            Job Card Generator
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Generate printable job cards from invoices with purchase order numbers.
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* View toggle */}
-          <div className="flex items-center border rounded-lg overflow-hidden">
-            <button
-              onClick={() => handleViewMode("list")}
-              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
-                viewMode === "list"
-                  ? "bg-purple-600 text-white"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <LayoutList className="w-4 h-4" />
-              List
-            </button>
-            <button
-              onClick={() => handleViewMode("kanban")}
-              className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
-                viewMode === "kanban"
-                  ? "bg-purple-600 text-white"
-                  : "text-muted-foreground hover:bg-muted"
-              }`}
-            >
-              <Columns className="w-4 h-4" />
-              Kanban
-            </button>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => setManualOpen(true)}
-            className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
-          >
-            <Plus className="w-4 h-4" />
-            Manual
-          </Button>
-          <Button
-            onClick={() => setGenerateOpen(true)}
-            className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
-          >
-            <FileText className="w-4 h-4" />
-            From Invoice
-          </Button>
-        </div>
-      </div>
+        <PageHeader
+          title="Job Card Generator"
+          subtitle="Generate printable job cards from invoices with purchase order numbers."
+          actions={
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* View toggle */}
+              <div className="flex items-center border rounded-lg overflow-hidden">
+                <button
+                  onClick={() => handleViewMode("list")}
+                  className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
+                    viewMode === "list"
+                      ? "bg-purple-600 text-white"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <LayoutList className="w-4 h-4" />
+                  List
+                </button>
+                <button
+                  onClick={() => handleViewMode("kanban")}
+                  className={`px-3 py-1.5 text-sm flex items-center gap-1.5 transition-colors ${
+                    viewMode === "kanban"
+                      ? "bg-purple-600 text-white"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  <Columns className="w-4 h-4" />
+                  Kanban
+                </button>
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => setManualOpen(true)}
+                className="gap-2 border-purple-300 text-purple-700 hover:bg-purple-50"
+              >
+                <Plus className="w-4 h-4" />
+                Manual
+              </Button>
+              <Button
+                onClick={() => setGenerateOpen(true)}
+                className="bg-purple-600 hover:bg-purple-700 text-white gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                From Invoice
+              </Button>
+            </div>
+          }
+        />
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">

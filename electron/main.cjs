@@ -1,13 +1,20 @@
 /**
  * Bester.Builds — Electron Main Process
  *
- * Starts the bundled Express server as a child process, waits for it to be
- * ready, then opens a BrowserWindow pointed at http://localhost:<port>.
+ * Startup sequence:
+ *   1. Show a branded splash window immediately (no server needed).
+ *   2. Start the bundled Express server as a child process.
+ *   3. Poll until the server is ready (max 30 s).
+ *   4. Create the main BrowserWindow (hidden).
+ *   5. Once the main window is ready-to-show, signal the splash to fade out,
+ *      then close it and reveal the main window.
  *
- * Auto-update: uses electron-updater to check GitHub Releases on startup.
+ * Auto-update: uses electron-updater to check GitHub Releases after launch.
  * IPC channels exposed to the renderer:
  *   updater:status   → { state, version?, percent?, error? }
- *   updater:install  → (renderer → main) trigger quit-and-install
+ *   updater:download → (renderer → main) start download
+ *   updater:install  → (renderer → main) quit and install
+ *   updater:get-status → (renderer → main, returns lastStatus)
  */
 
 const { app, BrowserWindow, shell, Menu, ipcMain, dialog } = require("electron");
@@ -18,67 +25,48 @@ const { autoUpdater } = require("electron-updater");
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const SERVER_PORT = 4321;
-const SERVER_URL = `http://localhost:${SERVER_PORT}`;
+const SERVER_URL  = `http://localhost:${SERVER_PORT}`;
 const MAX_WAIT_MS = 30_000;
 
-let mainWindow = null;
+let mainWindow   = null;
+let splashWindow = null;
 let serverProcess = null;
 
 // ─── Auto-updater setup ───────────────────────────────────────────────────────
 function setupAutoUpdater() {
-  // Silence the default electron-updater logger in production; pipe to console
   autoUpdater.logger = {
-    info: (msg) => console.log("[updater]", msg),
-    warn: (msg) => console.warn("[updater]", msg),
+    info:  (msg) => console.log("[updater]", msg),
+    warn:  (msg) => console.warn("[updater]", msg),
     error: (msg) => console.error("[updater]", msg),
     debug: () => {},
   };
 
-  // Do not auto-download — let the user decide
-  autoUpdater.autoDownload = false;
+  autoUpdater.autoDownload        = false;
   autoUpdater.autoInstallOnAppQuit = true;
 
-  // ── Events ──────────────────────────────────────────────────────────────────
-
-  autoUpdater.on("checking-for-update", () => {
-    sendUpdaterStatus({ state: "checking" });
-  });
-
-  autoUpdater.on("update-not-available", () => {
-    sendUpdaterStatus({ state: "up-to-date" });
-  });
-
-  autoUpdater.on("update-available", (info) => {
-    sendUpdaterStatus({
-      state: "available",
-      version: info.version,
-      releaseNotes: info.releaseNotes ?? null,
-    });
-  });
-
-  autoUpdater.on("download-progress", (progress) => {
-    sendUpdaterStatus({
-      state: "downloading",
-      percent: Math.round(progress.percent),
-      transferred: progress.transferred,
-      total: progress.total,
-      bytesPerSecond: progress.bytesPerSecond,
-    });
-  });
-
-  autoUpdater.on("update-downloaded", (info) => {
-    sendUpdaterStatus({
-      state: "downloaded",
-      version: info.version,
-    });
-  });
-
+  autoUpdater.on("checking-for-update",  ()     => sendUpdaterStatus({ state: "checking" }));
+  autoUpdater.on("update-not-available", ()     => sendUpdaterStatus({ state: "up-to-date" }));
+  autoUpdater.on("update-available",     (info) => sendUpdaterStatus({
+    state: "available",
+    version: info.version,
+    releaseNotes: info.releaseNotes ?? null,
+  }));
+  autoUpdater.on("download-progress", (progress) => sendUpdaterStatus({
+    state: "downloading",
+    percent: Math.round(progress.percent),
+    transferred: progress.transferred,
+    total: progress.total,
+    bytesPerSecond: progress.bytesPerSecond,
+  }));
+  autoUpdater.on("update-downloaded", (info) => sendUpdaterStatus({
+    state: "downloaded",
+    version: info.version,
+  }));
   autoUpdater.on("error", (err) => {
     console.error("[updater] error:", err.message);
     sendUpdaterStatus({ state: "error", error: err.message });
   });
 
-  // ── IPC: renderer asks to start download ────────────────────────────────────
   ipcMain.on("updater:download", () => {
     autoUpdater.downloadUpdate().catch((err) => {
       console.error("[updater] download failed:", err.message);
@@ -86,12 +74,10 @@ function setupAutoUpdater() {
     });
   });
 
-  // ── IPC: renderer asks to quit and install ──────────────────────────────────
   ipcMain.on("updater:install", () => {
     autoUpdater.quitAndInstall(false, true);
   });
 
-  // ── IPC: renderer asks for current status (e.g. after page reload) ──────────
   ipcMain.handle("updater:get-status", () => lastStatus);
 }
 
@@ -105,14 +91,12 @@ function sendUpdaterStatus(status) {
   }
 }
 
-// ─── Check for updates (called after window is shown) ────────────────────────
+// ─── Check for updates (called after main window is shown) ───────────────────
 function checkForUpdates() {
-  // Only check in packaged builds — dev mode has no update feed
   if (!app.isPackaged) {
     console.log("[updater] skipping update check in dev mode");
     return;
   }
-  // Delay slightly so the window is fully rendered before any notification
   setTimeout(() => {
     autoUpdater.checkForUpdates().catch((err) => {
       console.warn("[updater] check failed:", err.message);
@@ -126,10 +110,7 @@ function waitForServer(url, timeoutMs) {
     const deadline = Date.now() + timeoutMs;
     function attempt() {
       http
-        .get(url, (res) => {
-          res.resume();
-          resolve();
-        })
+        .get(url, (res) => { res.resume(); resolve(); })
         .on("error", () => {
           if (Date.now() > deadline) {
             reject(new Error("Server did not start in time"));
@@ -164,8 +145,69 @@ function startServer() {
   serverProcess.on("exit", (code) => console.log(`[server] exited with code ${code}`));
 }
 
+// ─── Splash window ────────────────────────────────────────────────────────────
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 420,
+    height: 320,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    movable: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    center: true,
+    backgroundColor: "#00000000",
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  const splashPath = app.isPackaged
+    ? path.join(process.resourcesPath, "splash.html")
+    : path.join(__dirname, "splash.html");
+
+  splashWindow.loadFile(splashPath, {
+    query: { v: app.getVersion() },
+  });
+
+  splashWindow.on("closed", () => {
+    splashWindow = null;
+  });
+}
+
+// ─── Close splash with fade-out, then reveal main window ─────────────────────
+function closeSplash() {
+  if (!splashWindow || splashWindow.isDestroyed()) {
+    showMainWindow();
+    return;
+  }
+
+  // Signal the splash HTML to start its fade-out animation
+  splashWindow.webContents.executeJavaScript(
+    `window.postMessage("close", "*");`
+  ).catch(() => {});
+
+  // Wait for the CSS fade-out (350 ms animation + 250 ms "Ready!" pause = ~650 ms)
+  setTimeout(() => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      splashWindow.close();
+    }
+    showMainWindow();
+  }, 650);
+}
+
+function showMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show();
+    mainWindow.focus();
+    checkForUpdates();
+  }
+}
+
 // ─── Create main window ───────────────────────────────────────────────────────
-function createWindow() {
+function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -178,16 +220,15 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
     },
-    show: false,
+    show: false,            // hidden until splash closes
     backgroundColor: "#0f0f11",
   });
 
   mainWindow.loadURL(SERVER_URL);
 
   mainWindow.once("ready-to-show", () => {
-    mainWindow.show();
-    mainWindow.focus();
-    checkForUpdates();
+    // Close splash and reveal main window
+    closeSplash();
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -202,7 +243,7 @@ function createWindow() {
     mainWindow = null;
   });
 
-  // ── Application menu (adds Help > Check for Updates) ────────────────────────
+  // ── Application menu ────────────────────────────────────────────────────────
   const menu = Menu.buildFromTemplate([
     {
       label: "Bester.Builds",
@@ -215,10 +256,10 @@ function createWindow() {
     {
       label: "View",
       submenu: [
-        { label: "Toggle DevTools", accelerator: "F12", click: () => mainWindow?.webContents.toggleDevTools() },
-        { label: "Zoom In", accelerator: "CmdOrCtrl+=", click: () => mainWindow?.webContents.setZoomLevel(mainWindow.webContents.getZoomLevel() + 0.5) },
-        { label: "Zoom Out", accelerator: "CmdOrCtrl+-", click: () => mainWindow?.webContents.setZoomLevel(mainWindow.webContents.getZoomLevel() - 0.5) },
-        { label: "Reset Zoom", accelerator: "CmdOrCtrl+0", click: () => mainWindow?.webContents.setZoomLevel(0) },
+        { label: "Toggle DevTools",  accelerator: "F12",          click: () => mainWindow?.webContents.toggleDevTools() },
+        { label: "Zoom In",          accelerator: "CmdOrCtrl+=",  click: () => mainWindow?.webContents.setZoomLevel(mainWindow.webContents.getZoomLevel() + 0.5) },
+        { label: "Zoom Out",         accelerator: "CmdOrCtrl+-",  click: () => mainWindow?.webContents.setZoomLevel(mainWindow.webContents.getZoomLevel() - 0.5) },
+        { label: "Reset Zoom",       accelerator: "CmdOrCtrl+0",  click: () => mainWindow?.webContents.setZoomLevel(0) },
       ],
     },
     {
@@ -242,14 +283,8 @@ function createWindow() {
           },
         },
         { type: "separator" },
-        {
-          label: `Version ${app.getVersion()}`,
-          enabled: false,
-        },
-        {
-          label: "View on GitHub",
-          click: () => shell.openExternal("https://github.com/JayBerioCode/bester-builds/releases"),
-        },
+        { label: `Version ${app.getVersion()}`, enabled: false },
+        { label: "View on GitHub", click: () => shell.openExternal("https://github.com/JayBerioCode/bester-builds/releases") },
       ],
     },
   ]);
@@ -259,18 +294,26 @@ function createWindow() {
 // ─── App lifecycle ────────────────────────────────────────────────────────────
 app.whenReady().then(async () => {
   setupAutoUpdater();
+
+  // 1. Show splash immediately — no server needed yet
+  createSplashWindow();
+
+  // 2. Start the Express server in the background
   startServer();
 
+  // 3. Wait for the server to be ready
   try {
     await waitForServer(SERVER_URL, MAX_WAIT_MS);
   } catch (err) {
     console.error("Server failed to start:", err.message);
+    // Close splash and show an empty window so the user isn't stuck
   }
 
-  createWindow();
+  // 4. Create the main window (hidden) — splash closes when it fires ready-to-show
+  createMainWindow();
 
   app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
   });
 });
 

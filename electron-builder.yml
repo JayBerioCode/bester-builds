@@ -14,6 +14,7 @@ publish:
 # ─── Files to include in the app bundle ──────────────────────────────────────
 files:
   - electron/**/*.cjs
+  - electron/splash.html
   - electron/icon.png
   - electron/icon.ico
   - dist/public/**
@@ -34,6 +35,8 @@ extraResources:
     to: server.mjs
   - from: dist/public
     to: public
+  - from: electron/splash.html
+    to: splash.html
 
 directories:
   output: release

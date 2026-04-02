@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -233,21 +234,21 @@ export default function Employees() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Employees</h1>
-          <p className="text-muted-foreground text-sm">Print shop staff management</p>
-        </div>
-        <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditEmployee(null); }}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Employee</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>{editEmployee ? "Edit Employee" : "Add Employee"}</DialogTitle></DialogHeader>
-            <EmployeeForm onSuccess={() => { setOpen(false); setEditEmployee(null); }} initial={editEmployee} />
-          </DialogContent>
-        </Dialog>
-      </div>
+      <PageHeader
+        title="Employees"
+        subtitle="Print shop staff management"
+        actions={
+          <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setEditEmployee(null); }}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Employee</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{editEmployee ? "Edit Employee" : "Add Employee"}</DialogTitle></DialogHeader>
+              <EmployeeForm onSuccess={() => { setOpen(false); setEditEmployee(null); }} initial={editEmployee} />
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Role Summary */}
       <div className="flex gap-2 flex-wrap">

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -240,32 +241,32 @@ export default function CRM() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">CRM</h1>
-          <p className="text-muted-foreground text-sm">Customer relationships &amp; lead pipeline</p>
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={leadOpen} onOpenChange={setLeadOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />New Lead</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
-              <LeadForm onSuccess={() => setLeadOpen(false)} />
-            </DialogContent>
-          </Dialog>
-          <Dialog open={customerOpen} onOpenChange={(o) => { setCustomerOpen(o); if (!o) setEditCustomer(null); }}>
-            <DialogTrigger asChild>
-              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Customer</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{editCustomer ? "Edit Customer" : "Add New Customer"}</DialogTitle></DialogHeader>
-              <CustomerForm onSuccess={() => { setCustomerOpen(false); setEditCustomer(null); }} initial={editCustomer} />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+      <PageHeader
+        title="CRM"
+        subtitle="Customer relationships &amp; lead pipeline"
+        actions={
+          <>
+            <Dialog open={leadOpen} onOpenChange={setLeadOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm"><Plus className="h-4 w-4 mr-1" />New Lead</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
+                <LeadForm onSuccess={() => setLeadOpen(false)} />
+              </DialogContent>
+            </Dialog>
+            <Dialog open={customerOpen} onOpenChange={(o) => { setCustomerOpen(o); if (!o) setEditCustomer(null); }}>
+              <DialogTrigger asChild>
+                <Button size="sm"><Plus className="h-4 w-4 mr-1" />Add Customer</Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+                <DialogHeader><DialogTitle>{editCustomer ? "Edit Customer" : "Add New Customer"}</DialogTitle></DialogHeader>
+                <CustomerForm onSuccess={() => { setCustomerOpen(false); setEditCustomer(null); }} initial={editCustomer} />
+              </DialogContent>
+            </Dialog>
+          </>
+        }
+      />
 
       <Tabs defaultValue="customers">
         <TabsList>

@@ -28,6 +28,7 @@ import {
   PackageSearch,
 } from "lucide-react";
 import { useState, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 
 const COLORS = ["#7c3aed", "#6366f1", "#06b6d4", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
@@ -85,14 +86,11 @@ export default function Analytics() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
-        <p className="text-muted-foreground text-sm">Business performance &amp; insights</p>
-      </div>
+      <PageHeader title="Analytics" subtitle="Business performance &amp; insights" />
 
       {/* KPI Summary */}
       {summaryLoading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           {Array.from({ length: 4 }).map((_, i) => (
             <Card key={i} className="border-0 shadow-sm">
               <CardContent className="p-5">
@@ -105,7 +103,7 @@ export default function Analytics() {
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card className="border-0 shadow-sm">
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
@@ -279,7 +277,7 @@ export default function Analytics() {
         </div>
 
         {/* Job Costing KPI Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <Card className="border-0 shadow-sm">
             <CardContent className="p-5">
               <div className="flex items-start justify-between">

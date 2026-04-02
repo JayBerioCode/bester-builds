@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -138,21 +139,21 @@ export default function Payments() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Payments</h1>
-          <p className="text-muted-foreground text-sm">Financial transactions &amp; cash flow</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />Record Payment</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Record Transaction</DialogTitle></DialogHeader>
-            <PaymentForm onSuccess={() => setOpen(false)} customers={customers} invoices={invoices} />
-          </DialogContent>
-        </Dialog>
-      </div>
+      <PageHeader
+        title="Payments"
+        subtitle="Financial transactions &amp; cash flow"
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />Record Payment</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Record Transaction</DialogTitle></DialogHeader>
+              <PaymentForm onSuccess={() => setOpen(false)} customers={customers} invoices={invoices} />
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

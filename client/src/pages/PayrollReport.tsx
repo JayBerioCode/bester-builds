@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -116,22 +117,20 @@ export default function PayrollReport() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Payroll Report</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Select a pay period to view employee hours and earnings, then export a PDF for your accountant.
-          </p>
-        </div>
-        <Button
-          onClick={handleDownloadPDF}
-          disabled={!report || report.length === 0}
-          className="bg-purple-700 hover:bg-purple-800 text-white gap-2"
-        >
-          <Download className="h-4 w-4" />
-          Download PDF
-        </Button>
-      </div>
+      <PageHeader
+        title="Payroll Report"
+        subtitle="Select a pay period to view employee hours and earnings, then export a PDF for your accountant."
+        actions={
+          <Button
+            onClick={handleDownloadPDF}
+            disabled={!report || report.length === 0}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download PDF
+          </Button>
+        }
+      />
 
       {/* Pay period selector */}
       <Card>

@@ -321,3 +321,89 @@
 - [x] Bundle Express server with esbuild into dist/server.mjs
 - [x] Package with electron-builder to produce Windows NSIS installer (97 MB)
 - [x] Upload and deliver .exe to user
+
+## GitHub Actions CI/CD Workflow
+- [x] Create .github/workflows/release.yml (triggers on v*.*.* tags + workflow_dispatch)
+- [x] Install wine32 in CI runner for cross-compilation on ubuntu-22.04
+- [x] Build Vite client + esbuild server + electron-builder in CI
+- [x] Create GitHub Release and upload .exe via softprops/action-gh-release
+- [x] Create .github/workflows/ci.yml (Vitest + TypeScript check on push/PR)
+- [x] Committed workflow files locally (bfe979e)
+- [x] Pushed source code to github.com/JayBerioCode/bester-builds
+- [ ] User to push workflow files manually (token lacks 'workflow' scope)
+- [x] Save checkpoint
+
+## Auto-Update Feature (electron-updater)
+- [x] Install electron-updater 6.8.3 as production dependency
+- [x] Implement auto-update logic in electron/main.js (check 3s after window show, download on demand, install on quit)
+- [x] IPC channels: updater:status (main→renderer), updater:download, updater:install, updater:get-status
+- [x] Preload.js exposes window.electronUpdater bridge (onStatus, offStatus, getStatus, download, install)
+- [x] UpdateBanner.tsx React component (available/downloading/downloaded/error states, progress bar, dismiss)
+- [x] Mounted UpdateBanner in App.tsx above Router
+- [x] electron-builder.yml: added publish config (github, JayBerioCode/bester-builds) + electron-updater node_modules includes
+- [x] release.yml: updated to use --publish always so latest.yml + blockmap are uploaded automatically
+- [x] Help > Check for Updates menu item in Electron app menu
+- [x] 147/147 tests passing, 0 TypeScript errors
+- [x] Save checkpoint
+
+## Code Signing (Windows Authenticode)
+- [x] electron-builder.yml: added signingHashAlgorithms (sha256+sha1), rfc3161TimeStampServer, certificateSubjectName comment
+- [x] release.yml: decode WIN_CERTIFICATE_BASE64 secret to /tmp/certificate.pfx, pass CSC_LINK/CSC_KEY_PASSWORD/WIN_CSC_LINK/WIN_CSC_KEY_PASSWORD to electron-builder
+- [x] release.yml: graceful fallback when secret absent (CSC_IDENTITY_AUTO_DISCOVERY=false, unsigned build)
+- [x] release.yml: signing status report step + conditional ✅/⚠️ in release notes
+- [x] CODE_SIGNING.md: OV vs EV comparison table, DigiCert/Sectigo/SSL.com options, base64 encoding steps, GitHub secrets setup, cloud HSM (DigiCert KeyLocker, SSL.com eSigner, Azure Trusted Signing), local testing with osslsigncode, troubleshooting
+- [x] 147/147 tests passing
+- [x] Save checkpoint
+
+## Bug Fix: Electron ESM/CJS Crash on Install
+- [x] Renamed electron/main.js → electron/main.cjs
+- [x] Renamed electron/preload.js → electron/preload.cjs
+- [x] Updated package.json "main" to electron/main.cjs
+- [x] Updated electron-builder.yml files glob to electron/**/*.cjs + icon files
+- [x] Fixed preload path reference in main.cjs to preload.cjs
+- [x] Fixed electron-builder.yml: moved signingHashAlgorithms + rfc3161TimeStampServer into signtoolOptions
+- [x] Rebuilt installer — asar verified: main.cjs + preload.cjs present, package.json main=electron/main.cjs
+- [x] Save checkpoint
+
+## GitHub Actions Workflow Update (main.cjs fix)
+- [x] Confirmed release.yml already uses pnpm scripts (no hardcoded main.js references)
+- [x] Confirmed electron-builder.yml files glob updated to electron/**/*.cjs
+- [x] Pushed electron/main.cjs to GitHub via API
+- [x] Pushed electron/preload.cjs to GitHub via API
+- [x] Pushed updated electron-builder.yml to GitHub via API
+- [x] Pushed updated package.json (main=electron/main.cjs) to GitHub via API
+- [x] Deleted old electron/main.js and electron/preload.js from GitHub
+- [x] Workflow files (release.yml, ci.yml) require manual push (token lacks workflow scope)
+- [x] Packaged workflow zip for manual push
+- [x] Save checkpoint
+
+## Full UI Polish & Responsiveness Pass
+- [x] Created shared PageHeader component (title + subtitle + optional action buttons)
+- [x] Created shared StatCard component (icon, value, label, trend, colour variants)
+- [x] Created shared EmptyState component (icon, title, description, optional CTA)
+- [x] Global: table overflow-x-auto on all list pages (Invoices, Orders, Payments, ClockIn, ShiftApproval, PayrollReport)
+- [x] Global: stat card grid 2-col mobile / 4-col desktop on all pages with grid-cols-4
+- [x] Dashboard: PageHeader applied, module overview cards consistent
+- [x] Analytics: PageHeader applied, chart grids responsive (grid-cols-2 md:grid-cols-4)
+- [x] CRM: PageHeader applied
+- [x] Orders: PageHeader applied
+- [x] Invoices: PageHeader applied, table overflow-x-auto
+- [x] Payments: PageHeader applied
+- [x] Tasks: PageHeader applied
+- [x] Scheduling: PageHeader applied
+- [x] Job Cards: PageHeader applied (overdue + mobile already done)
+- [x] Clock In/Out: PageHeader applied, KPI grid responsive
+- [x] Shift Approval: PageHeader applied, stats grid 1-col mobile / 3-col desktop
+- [x] Pricing Rates: PageHeader applied with action button
+- [x] Notifications: PageHeader applied, stats grid 2-col mobile / 4-col desktop
+- [x] Payroll Report: PageHeader applied, Download PDF button uses theme token
+- [x] Employees: PageHeader applied with Add Employee dialog action
+- [x] 147/147 tests passing, 0 TypeScript errors
+- [x] Save checkpoint
+
+## Electron Splash Screen
+- [x] Created electron/splash.html (420×320, frameless, transparent, dark theme, purple gradient logo mark, animated progress bar, cycling status messages)
+- [x] Updated electron/main.cjs: splash opens immediately on app.whenReady(), main window hidden until ready-to-show fires, then splash fades out (postMessage → CSS animation → close) and main window is revealed
+- [x] Added splash.html to electron-builder.yml files glob and extraResources (copies to resources/splash.html)
+- [x] Rebuilt installer (97 MB) — splash.html confirmed in win-unpacked/resources/
+- [x] 147/147 tests passing

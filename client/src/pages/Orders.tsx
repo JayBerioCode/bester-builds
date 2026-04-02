@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -456,21 +457,21 @@ export default function Orders() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Orders</h1>
-          <p className="text-muted-foreground text-sm">Print job management &amp; production tracking</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Order</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Create New Order / Quote</DialogTitle></DialogHeader>
-            <OrderForm onSuccess={() => setOpen(false)} customers={customers} />
-          </DialogContent>
-        </Dialog>
-      </div>
+      <PageHeader
+        title="Orders"
+        subtitle="Print job management &amp; production tracking"
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Order</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Create New Order / Quote</DialogTitle></DialogHeader>
+              <OrderForm onSuccess={() => setOpen(false)} customers={customers} />
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {/* Status Pipeline */}
       <div className="flex gap-2 overflow-x-auto pb-2">

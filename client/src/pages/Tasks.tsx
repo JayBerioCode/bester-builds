@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -151,21 +152,21 @@ export default function Tasks() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Tasks</h1>
-          <p className="text-muted-foreground text-sm">Production tasks &amp; workload management</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Task</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Create Task</DialogTitle></DialogHeader>
-            <TaskForm onSuccess={() => setOpen(false)} employees={employees} orders={orders} />
-          </DialogContent>
-        </Dialog>
-      </div>
+      <PageHeader
+        title="Tasks"
+        subtitle="Production tasks &amp; workload management"
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Task</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Create Task</DialogTitle></DialogHeader>
+              <TaskForm onSuccess={() => setOpen(false)} employees={employees} orders={orders} />
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <div className="flex gap-2 flex-wrap">
         {["all", ...statusFlow, "cancelled"].map((s) => {

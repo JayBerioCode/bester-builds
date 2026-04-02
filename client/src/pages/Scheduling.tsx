@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -208,21 +209,21 @@ export default function Scheduling() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Scheduling</h1>
-          <p className="text-muted-foreground text-sm">Appointments, production timelines &amp; deliveries</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Appointment</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Book Appointment</DialogTitle></DialogHeader>
-            <AppointmentForm onSuccess={() => setOpen(false)} customers={customers} employees={employees} orders={orders} />
-          </DialogContent>
-        </Dialog>
-      </div>
+      <PageHeader
+        title="Scheduling"
+        subtitle="Appointments, production timelines &amp; deliveries"
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Appointment</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Book Appointment</DialogTitle></DialogHeader>
+              <AppointmentForm onSuccess={() => setOpen(false)} customers={customers} employees={employees} orders={orders} />
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Calendar */}

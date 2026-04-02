@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -365,20 +366,12 @@ export default function ClockIn() {
   const activeCount = employees.filter((e) => e.status === "active").length;
 
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Clock className="w-6 h-6 text-primary" />
-            Clock In / Out
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Track employee shifts, worked hours, and daily earnings.
-          </p>
-        </div>
+        <PageHeader title="Clock In / Out" subtitle="Track employee shifts, worked hours, and daily earnings." />
 
         {/* Overview KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card>
             <CardContent className="pt-5">
               <div className="flex items-center justify-between">

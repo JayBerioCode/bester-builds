@@ -28,6 +28,7 @@ import ShiftApproval from "./pages/ShiftApproval";
 import NotificationCentre from "./pages/NotificationCentre";
 import JobCardGenerator from "./pages/JobCardGenerator";
 import { PwaInstallBanner } from "./components/PwaInstallBanner";
+import { UpdateBanner } from "./components/UpdateBanner";
 
 function Router() {
   return (
@@ -76,6 +77,7 @@ function App() {
       <ThemeProvider defaultTheme="light">
         <TooltipProvider>
           <Toaster />
+          <UpdateBanner />
           <Router />
           <PwaInstallBanner />
         </TooltipProvider>

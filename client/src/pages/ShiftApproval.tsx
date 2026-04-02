@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -191,20 +192,12 @@ export default function ShiftApproval() {
   );
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <CheckSquare className="w-6 h-6 text-purple-500" />
-          Shift Approval
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Review, approve, or reject employee shift logs before they feed into payroll.
-        </p>
-      </div>
+      <PageHeader title="Shift Approval" subtitle="Review, approve, or reject employee shift logs before they feed into payroll." />
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">

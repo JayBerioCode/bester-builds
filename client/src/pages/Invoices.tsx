@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -164,21 +165,21 @@ export default function Invoices() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Invoices</h1>
-          <p className="text-muted-foreground text-sm">Billing &amp; payment tracking</p>
-        </div>
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Invoice</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader><DialogTitle>Generate Invoice</DialogTitle></DialogHeader>
-            <InvoiceForm onSuccess={() => setOpen(false)} customers={customers} orders={orders} />
-          </DialogContent>
-        </Dialog>
-      </div>
+      <PageHeader
+        title="Invoices"
+        subtitle="Billing &amp; payment tracking"
+        actions={
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm"><Plus className="h-4 w-4 mr-1" />New Invoice</Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader><DialogTitle>Generate Invoice</DialogTitle></DialogHeader>
+              <InvoiceForm onSuccess={() => setOpen(false)} customers={customers} orders={orders} />
+            </DialogContent>
+          </Dialog>
+        }
+      />
 
       {totalOutstanding > 0 && (
         <Card className="border-0 shadow-sm bg-gradient-to-r from-primary/5 to-primary/10">

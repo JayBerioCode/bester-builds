@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -183,23 +184,18 @@ export default function PricingRates() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Tag className="w-6 h-6 text-primary" />
-            Pricing Rates
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            Manage material rates used by the print cost calculator. Changes apply immediately to new quotes.
-          </p>
-        </div>
-        <Button onClick={() => { setForm(emptyForm); setShowAdd(true); }} className="gap-2">
-          <Plus className="w-4 h-4" />
-          Add Rate
-        </Button>
-      </div>
+      <PageHeader
+        title="Pricing Rates"
+        subtitle="Manage material rates used by the print cost calculator. Changes apply immediately to new quotes."
+        actions={
+          <Button onClick={() => { setForm(emptyForm); setShowAdd(true); }} className="gap-2">
+            <Plus className="w-4 h-4" />
+            Add Rate
+          </Button>
+        }
+      />
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

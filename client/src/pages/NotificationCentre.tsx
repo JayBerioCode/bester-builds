@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/PageHeader";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -79,20 +80,12 @@ export default function NotificationCentre() {
   const unreadCount = (notifications as any[]).filter((n) => !n.isRead).length;
 
   return (
-    <div className="p-6 space-y-6 max-w-6xl">
+    <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Bell className="w-6 h-6 text-purple-500" />
-          Notification Centre
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          All notifications sent to employees — track delivery and read status.
-        </p>
-      </div>
+      <PageHeader title="Notification Centre" subtitle="All notifications sent to employees — track delivery and read status." />
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="pt-5">
             <div className="flex items-center gap-3">
