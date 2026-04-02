@@ -112,11 +112,13 @@ The app supports two parallel auth flows:
 1. **OAuth** — Google and Manus (`server/_core/oauth.ts`). Stores session in `users` table.
 2. **Local auth** — Email + password (`localUsers` table, bcrypt hashed). Role: `admin` or `employee`.
 
-Session is managed via a cookie named `app_session_id` (1-year expiry, set in `server/_core/cookies.ts`).
+The two auth flows use **separate cookies**:
+- **OAuth** → `app_session_id` cookie (set in `server/_core/oauth.ts`; read via `sdk.authenticateRequest` in `server/_core/context.ts`)
+- **Local auth** → `bester_local_session` cookie (set/read directly in handlers in `server/routers.ts` via `LOCAL_AUTH_COOKIE`)
 
 **Procedure guards in tRPC:**
-- `publicProcedure` — No auth required
-- `protectedProcedure` — Auth required (either OAuth or local auth)
+- `publicProcedure` — No middleware auth check; used for all local-auth endpoints (which verify `bester_local_session` in-handler) and truly public routes
+- `protectedProcedure` — Checks `ctx.user`, which is populated **only from the OAuth session** (`app_session_id`). Local-auth users will always be `UNAUTHORIZED` if a procedure uses this guard — do not use it for local-auth routes
 - Admin checks — Done inline per-procedure via role field
 
 **Employee signup** is gated by an allowlist (`employeeAllowlist` table).
