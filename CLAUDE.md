@@ -216,27 +216,34 @@ All DB query helpers live in `server/db.ts`. Add new queries there rather than w
 **Backend patterns:**
 - New tRPC procedures go in `server/routers.ts` under the appropriate sub-router
 - New DB queries go in `server/db.ts`
-- Use `protectedProcedure` by default; only use `publicProcedure` for login/signup endpoints
+- Use `protectedProcedure` for OAuth-session-protected endpoints (most admin operations)
+- Use `publicProcedure` when auth is handled in the handler itself — this is common and intentional for: PIN kiosk endpoints (unauthenticated by design), employee portal routes (JWT cookie checked inline), session management (me/logout), and notifications/allowlist (role checked in handler). Do not "fix" these to `protectedProcedure` — that would break the kiosk and employee portal flows
 - Throw `new TRPCError({ code: "UNAUTHORIZED" })` for auth failures, not plain errors
 
 ---
 
 ## Environment Variables
 
-The server reads from `.env`. Required variables:
+The server reads from `.env` via `server/_core/env.ts`. Required variables:
 
 ```
-DATABASE_URL        # MySQL connection string
-SESSION_SECRET      # Cookie signing secret
-GOOGLE_CLIENT_ID    # OAuth
-GOOGLE_CLIENT_SECRET
-AWS_ACCESS_KEY_ID   # S3 storage
-AWS_SECRET_ACCESS_KEY
-AWS_REGION
-AWS_S3_BUCKET
+DATABASE_URL              # MySQL connection string (also used by drizzle.config.ts)
+JWT_SECRET                # Cookie signing secret + JWT signing (falls back to "fallback-secret" if unset — set this in production)
+OAUTH_SERVER_URL          # Manus OAuth server base URL
+OWNER_OPEN_ID             # OAuth owner identifier
+VITE_APP_ID               # Application ID for OAuth/Manus integration
+BUILT_IN_FORGE_API_URL    # Storage proxy base URL (replaces AWS S3)
+BUILT_IN_FORGE_API_KEY    # Storage proxy auth token
 ```
 
-The `drizzle.config.ts` also requires `DATABASE_URL`.
+Optional:
+
+```
+PORT                      # HTTP port (default: 3000)
+NODE_ENV                  # "production" enables production mode
+```
+
+> Note: Storage uses a Manus/Forge proxy (`BUILT_IN_FORGE_API_URL` + `BUILT_IN_FORGE_API_KEY`), **not** AWS S3. There are no AWS env vars.
 
 ---
 
