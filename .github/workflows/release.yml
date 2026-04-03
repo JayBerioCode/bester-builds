@@ -1,7 +1,7 @@
-name: Build & Release Windows Installer
+name: Build and Release Windows Installer
 
 # Triggers:
-#   1. Push a version tag  →  git tag v1.2.3 && git push origin v1.2.3
+#   1. Push a version tag  ->  git tag v1.2.3 && git push origin v1.2.3
 #   2. Manual run from the Actions tab (useful for testing)
 on:
   push:
@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   build-windows:
-    name: Build & Sign Windows NSIS Installer
+    name: Build and Sign Windows NSIS Installer
     runs-on: ubuntu-22.04
 
     # Required for GITHUB_TOKEN to create releases and upload assets
@@ -28,11 +28,11 @@ jobs:
       contents: write
 
     steps:
-      # ── 1. Checkout ────────────────────────────────────────────────────────
+      # -- 1. Checkout --------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. Node.js + pnpm ──────────────────────────────────────────────────
+      # -- 2. Node.js + pnpm --------------------------------------------------
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -45,18 +45,18 @@ jobs:
           version: 9
           run_install: false
 
-      # ── 3. Wine (required for cross-compiling Windows .exe on Linux) ───────
+      # -- 3. Wine (required for cross-compiling Windows .exe on Linux) -------
       - name: Install Wine (32-bit + 64-bit)
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update -qq
           sudo apt-get install -y wine wine64 wine32 --no-install-recommends
 
-      # ── 4. Dependencies ────────────────────────────────────────────────────
+      # -- 4. Dependencies ----------------------------------------------------
       - name: Install project dependencies
         run: pnpm install --frozen-lockfile
 
-      # ── 5. Build ───────────────────────────────────────────────────────────
+      # -- 5. Build -----------------------------------------------------------
       - name: Build Vite client bundle
         run: pnpm electron:build-client
         env:
@@ -67,7 +67,7 @@ jobs:
         env:
           NODE_ENV: production
 
-      # ── 6. Resolve version tag ─────────────────────────────────────────────
+      # -- 6. Resolve version tag ---------------------------------------------
       - name: Resolve release version
         id: version
         run: |
@@ -77,7 +77,7 @@ jobs:
             echo "tag=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
           fi
 
-      # ── 7. Sync package.json version with tag ──────────────────────────────
+      # -- 7. Sync package.json version with tag ------------------------------
       - name: Sync package.json version
         run: |
           TAG="${{ steps.version.outputs.tag }}"
@@ -90,7 +90,7 @@ jobs:
             console.log('Set version to', pkg.version);
           "
 
-      # ── 8. Prepare code-signing certificate ────────────────────────────────
+      # -- 8. Prepare code-signing certificate --------------------------------
       # The certificate is stored as a base64-encoded .pfx file in the
       # WIN_CERTIFICATE_BASE64 repository secret.
       #
@@ -98,17 +98,23 @@ jobs:
       #   base64 -w 0 your-certificate.pfx > cert_b64.txt
       #   Then paste the contents into the WIN_CERTIFICATE_BASE64 secret.
       #
-      # If the secret is absent the step is skipped and the build proceeds
-      # unsigned (SmartScreen warning will still appear).
+      # If the secret is absent the step outputs an empty path and the build
+      # proceeds unsigned (SmartScreen warning will still appear).
       - name: Decode signing certificate
         id: cert
-        if: ${{ secrets.WIN_CERTIFICATE_BASE64 != '' }}
         run: |
-          echo "${{ secrets.WIN_CERTIFICATE_BASE64 }}" | base64 --decode > /tmp/certificate.pfx
-          echo "path=/tmp/certificate.pfx" >> "$GITHUB_OUTPUT"
-          echo "Certificate decoded successfully ($(wc -c < /tmp/certificate.pfx) bytes)"
+          if [[ -n "$WIN_CERT" ]]; then
+            echo "$WIN_CERT" | base64 --decode > /tmp/certificate.pfx
+            echo "path=/tmp/certificate.pfx" >> "$GITHUB_OUTPUT"
+            echo "Certificate decoded successfully ($(wc -c < /tmp/certificate.pfx) bytes)"
+          else
+            echo "path=" >> "$GITHUB_OUTPUT"
+            echo "No certificate secret found - build will be unsigned"
+          fi
+        env:
+          WIN_CERT: ${{ secrets.WIN_CERTIFICATE_BASE64 }}
 
-      # ── 9. Package + sign + publish ────────────────────────────────────────
+      # -- 9. Package + sign + publish ----------------------------------------
       # electron-builder reads CSC_LINK and CSC_KEY_PASSWORD for signing.
       # When WIN_CERTIFICATE_BASE64 is absent, CSC_IDENTITY_AUTO_DISCOVERY=false
       # disables signing so the build still succeeds without a certificate.
@@ -117,15 +123,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           ELECTRON_BUILDER_ALLOW_UNRESOLVED_DEPENDENCIES: true
-          # ── Signing (only active when certificate secret is present) ──────
           CSC_LINK: ${{ steps.cert.outputs.path != '' && format('file://{0}', steps.cert.outputs.path) || '' }}
           CSC_KEY_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
           WIN_CSC_LINK: ${{ steps.cert.outputs.path != '' && format('file://{0}', steps.cert.outputs.path) || '' }}
           WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CERTIFICATE_PASSWORD }}
-          # Disable auto-discovery only when no cert is provided
           CSC_IDENTITY_AUTO_DISCOVERY: ${{ steps.cert.outputs.path != '' && 'true' || 'false' }}
 
-      # ── 10. Verify signature (optional, informational) ─────────────────────
+      # -- 10. Verify signature (optional, informational) ---------------------
       - name: Report signing status
         if: always()
         run: |
@@ -133,24 +137,23 @@ jobs:
           if [[ -f "$EXE" ]]; then
             echo "Installer: $EXE ($(du -sh "$EXE" | cut -f1))"
             if [[ "${{ steps.cert.outputs.path }}" != "" ]]; then
-              echo "✅ Build was signed with certificate"
+              echo "Build was signed with certificate"
             else
-              echo "⚠️  Build is UNSIGNED (WIN_CERTIFICATE_BASE64 secret not set)"
-              echo "   Users will see a Windows SmartScreen warning."
-              echo "   See CODE_SIGNING.md for instructions to add your certificate."
+              echo "Build is UNSIGNED (WIN_CERTIFICATE_BASE64 secret not set)"
+              echo "Users will see a Windows SmartScreen warning."
             fi
           else
-            echo "❌ No installer found in release/"
+            echo "No installer found in release/"
           fi
 
-      # ── 11. Find installer name for release notes ──────────────────────────
+      # -- 11. Find installer name for release notes --------------------------
       - name: Find installer name
         id: installer
         run: |
           EXE=$(find release -maxdepth 1 -name "*.exe" ! -name "*uninstaller*" | head -1)
           echo "name=$(basename "$EXE")" >> "$GITHUB_OUTPUT"
 
-      # ── 12. Append install instructions to the release body ────────────────
+      # -- 12. Append install instructions to the release body ----------------
       - name: Update release notes
         uses: softprops/action-gh-release@v2
         with:
@@ -163,9 +166,8 @@ jobs:
             ### Installation
             1. Download **${{ steps.installer.outputs.name }}** below.
             2. Double-click the installer and follow the wizard.
-            3. ${{ steps.cert.outputs.path != '' && '✅ This build is **code-signed** — no SmartScreen warning.' || '⚠️ This build is **unsigned**. Click **More info → Run anyway** if prompted by Windows SmartScreen.' }}
-            4. Launch from the desktop shortcut or Start Menu.
-            5. **Existing installs are notified automatically** via the in-app update banner.
+            3. Launch from the desktop shortcut or Start Menu.
+            4. **Existing installs are notified automatically** via the in-app update banner.
 
             ### Requirements
             - Windows 10 or later (64-bit)
